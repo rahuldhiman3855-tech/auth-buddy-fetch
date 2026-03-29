@@ -60,25 +60,39 @@ async function getAuthToken(): Promise<string> {
   return token
 }
 
-/** Fetch posts using authenticated getAllPost endpoint for HD URLs */
+/** Fetch ALL posts using authenticated getAllPost endpoint, paginating through */
 async function fetchCreatorPostsHD(influencerId: string): Promise<any[]> {
   try {
     const token = await getAuthToken()
-    const res = await fetch(`${API_BASE}/posts/getAllPost/${influencerId}/0/200`, {
-      method: 'GET',
-      headers: {
-        'accept': 'application/json',
-        'content-type': 'application/json',
-        'x-off-country-code': 'IN',
-        'Authorization': `bearer ${token}`,
-      },
-    })
-    if (!res.ok) {
-      // Fallback to public endpoint
-      return fetchCreatorPostsPublic(influencerId)
+    const allPosts: any[] = []
+    let skip = 0
+    const pageSize = 50
+
+    while (true) {
+      const res = await fetch(`${API_BASE}/posts/getAllPost/${influencerId}/${skip}/${pageSize}`, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'x-off-country-code': 'IN',
+          'Authorization': `bearer ${token}`,
+        },
+      })
+      if (!res.ok) {
+        // Fallback to public endpoint if auth fails on first page
+        if (skip === 0) return fetchCreatorPostsPublic(influencerId)
+        break
+      }
+      const data = await res.json()
+      const posts = (data?.data ?? []).filter((p: any) => !p.isDeleted && !p.isHided)
+      allPosts.push(...posts)
+
+      // If we got fewer than pageSize, we've reached the end
+      if (posts.length < pageSize) break
+      skip += pageSize
     }
-    const data = await res.json()
-    return (data?.data ?? []).filter((p: any) => !p.isDeleted && !p.isHided)
+
+    return allPosts
   } catch {
     return fetchCreatorPostsPublic(influencerId)
   }
