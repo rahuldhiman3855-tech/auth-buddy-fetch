@@ -279,6 +279,23 @@ export default function Index() {
     }
   };
 
+  const handlePlayPost = async (post: StoredPost) => {
+    setActivePost(post);
+    const existingMedia = post.media_url || post.location;
+    if (existingMedia) {
+      setActiveMediaUrl(existingMedia);
+      return;
+    }
+    // Fetch on-demand
+    setLoadingMedia(true);
+    setActiveMediaUrl("");
+    const result = await fetchPostMediaUrl(post.creator_id, post.official_id);
+    if (result?.mediaUrl) {
+      setActiveMediaUrl(result.mediaUrl);
+    }
+    setLoadingMedia(false);
+  };
+
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   const clearFilters = () => {
