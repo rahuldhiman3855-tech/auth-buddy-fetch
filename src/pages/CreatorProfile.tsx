@@ -357,13 +357,12 @@ export default function CreatorProfile() {
                       />
                     );
                   }
-                  return null;
-                })() || (
-                ) : (
-                  <div className="flex items-center justify-center py-32 text-muted-foreground">
-                    <p>No media available</p>
-                  </div>
-                )}
+                  return (
+                    <div className="flex items-center justify-center py-32 text-muted-foreground">
+                      <p>No media available</p>
+                    </div>
+                  );
+                })()}
               </div>
               <p className="mt-3 text-sm text-white/80 line-clamp-2">
                 {decodeContent(activePost.content)}
