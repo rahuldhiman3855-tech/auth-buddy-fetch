@@ -1,4 +1,4 @@
-import { Search, Bell } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -22,6 +22,7 @@ export default function Navbar() {
         <Link to="/" className="flex items-center gap-1">
           <span className="text-2xl font-black italic text-primary">O</span>
           <span className="text-lg font-bold tracking-tight text-foreground">fficial.me</span>
+          <span className="ml-2 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Admin</span>
         </Link>
 
         <Link
@@ -38,16 +39,6 @@ export default function Navbar() {
             className="md:hidden rounded-full p-2 hover:bg-muted"
           >
             <Search className="h-5 w-5 text-muted-foreground" />
-          </Link>
-          <button className="relative rounded-full p-2 hover:bg-muted">
-            <Bell className="h-5 w-5 text-muted-foreground" />
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
-          </button>
-          <Link
-            to="/login"
-            className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
-          >
-            Creator Login
           </Link>
         </div>
       </div>

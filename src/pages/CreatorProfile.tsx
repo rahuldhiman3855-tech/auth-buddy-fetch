@@ -16,14 +16,12 @@ import {
   Play,
   Eye,
   Heart,
-  Crown,
   Loader2,
-  Lock,
   Clock,
   X,
 } from "lucide-react";
 
-function PostCard({ post, currencySymbol = "₹", onPlay }: { post: PostData; currencySymbol?: string; onPlay: (post: PostData) => void }) {
+function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) => void }) {
   const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
   const title = decodeContent(post.content) || "Untitled";
   const isPrivate = post.category === "private";
@@ -69,18 +67,6 @@ function PostCard({ post, currencySymbol = "₹", onPlay }: { post: PostData; cu
           </span>
         )}
 
-        {/* Price / Premium badge */}
-        {isPrivate && post.price ? (
-          <span className="absolute top-2 left-2 flex items-center gap-0.5 rounded-full bg-amber-500 px-2.5 py-1 text-xs font-bold text-white">
-            <Crown className="h-3 w-3" />
-            {currencySymbol}{post.price}
-          </span>
-        ) : isPrivate ? (
-          <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-primary-foreground">
-            <Lock className="h-3 w-3" />
-            Private
-          </span>
-        ) : null}
 
         {/* Type badge */}
         {post.type && (
@@ -250,24 +236,7 @@ export default function CreatorProfile() {
                       ) : null}
                     </div>
 
-                    {/* Subscription plans */}
-                    {influencer.subscriptionDetails && influencer.subscriptionDetails.length > 0 && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {influencer.subscriptionDetails.map((sub) => (
-                          <div
-                            key={sub._id}
-                            className="flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs font-medium text-amber-700"
-                          >
-                            <Crown className="h-3 w-3" />
-                            {sub.packType} days — ₹{sub.amount}
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
-                  <button className="self-start md:self-end rounded-full bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground hover:opacity-90 transition-opacity shadow-lg">
-                    Follow
-                  </button>
                 </div>
               </div>
             </div>
