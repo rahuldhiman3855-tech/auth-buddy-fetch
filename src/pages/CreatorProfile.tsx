@@ -19,6 +19,7 @@ import {
   Loader2,
   Clock,
   X,
+  Download,
 } from "lucide-react";
 
 function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) => void }) {
@@ -67,6 +68,28 @@ function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) =
           </span>
         )}
 
+        {/* Download button */}
+        {(post.location || post.mediaUrl) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
+              const mediaUrl = post.location || post.mediaUrl || '';
+              const proxiedUrl = `${proxyBase}?url=${encodeURIComponent(mediaUrl)}`;
+              const a = document.createElement('a');
+              a.href = proxiedUrl;
+              a.download = `${decodeContent(post.content) || post._id}.${post.type === 'Video' ? 'mp4' : 'jpg'}`;
+              a.target = '_blank';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }}
+            className="absolute top-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white hover:bg-primary transition-colors opacity-0 group-hover:opacity-100"
+            title="Download"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+        )}
 
         {/* Type badge */}
         {post.type && (
