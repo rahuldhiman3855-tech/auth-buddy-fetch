@@ -1,0 +1,1 @@
+DELETE FROM creators WHERE post_count = 0 OR post_count IS NULL;

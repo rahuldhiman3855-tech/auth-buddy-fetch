@@ -9,11 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 20;
 
-// Seed some known creators on first load
-const SEED_USERNAMES = [
-  "pankhurikunall", "admin", "aaboraofficial", "sachinbainsla",
-  "ananyapanday", "bikiinibae", "hotgirlzz"
-];
 
 export default function Index() {
   const [creators, setCreators] = useState<StoredCreator[]>([]);
