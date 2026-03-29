@@ -7,11 +7,9 @@ const corsHeaders = {
 
 const API_BASE = 'https://api.official.me'
 const AUTH_KEY = 'd41d8cd98f00b204e9800998ecf8427e'
+const ADMIN_USER_ID = '6144858b2f03d06a7dd008e4'
 const BATCH_SIZE = 3
 const DELAY_MS = 2000
-
-let cachedToken: string | null = null
-let tokenExpiry = 0
 
 function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms))
@@ -27,98 +25,44 @@ function decodeContent(content?: string): string {
   }
 }
 
-async function getAuthToken(): Promise<string> {
-  const now = Date.now()
-  if (cachedToken && now < tokenExpiry) return cachedToken
+/** Fetch ALL posts for a creator by paginating through getUserPost */
+async function fetchAllCreatorPosts(influencerId: string): Promise<any[]> {
+  const allPosts: any[] = []
+  let skip = 0
+  const pageSize = 100
 
-  // Use influencer login - required for getAllPost endpoint
-  const res = await fetch(`${API_BASE}/login`, {
-    method: 'POST',
-    headers: {
-      'accept': 'application/json',
-      'content-type': 'application/json',
-      'x-off-country-code': 'IN',
-    },
-    body: JSON.stringify({
-      email: 'lovableadmin1@proton.me',
-      password: 'Admin@12345',
-      influencerUsername: 'lovableadmin1',
-    }),
-  })
-
-  if (!res.ok) throw new Error(`Auth failed: ${res.status}`)
-  const data = await res.json()
-  const token = data?.accessToken || data?.savedUserData?.accessToken
-  if (!token) throw new Error('No token in auth response')
-
-  cachedToken = token
-  tokenExpiry = now + 50 * 60 * 1000
-  return token
-}
-
-/** Fetch ALL posts using authenticated getAllPost endpoint, paginating through */
-async function fetchCreatorPostsHD(influencerId: string): Promise<any[]> {
-  try {
-    const token = await getAuthToken()
-    const allPosts: any[] = []
-    let skip = 0
-    const pageSize = 50
-
-    while (true) {
-      const res = await fetch(`${API_BASE}/posts/getAllPost/${influencerId}/${skip}/${pageSize}`, {
-        method: 'GET',
+  while (true) {
+    try {
+      const res = await fetch(`${API_BASE}/posts/getUserPost`, {
+        method: 'POST',
         headers: {
           'accept': 'application/json',
           'content-type': 'application/json',
           'x-off-country-code': 'IN',
-          'Authorization': `bearer ${token}`,
         },
+        body: JSON.stringify({
+          isLogin: 'false',
+          influencerId,
+          userId: ADMIN_USER_ID,
+          skip,
+          limit: pageSize,
+          key: AUTH_KEY,
+        }),
       })
-      if (!res.ok) {
-        // Fallback to public endpoint if auth fails on first page
-        if (skip === 0) return fetchCreatorPostsPublic(influencerId)
-        break
-      }
+      if (!res.ok) break
       const data = await res.json()
       const posts = (data?.data ?? []).filter((p: any) => !p.isDeleted && !p.isHided)
+      if (posts.length === 0) break
       allPosts.push(...posts)
-
-      // If we got fewer than pageSize, we've reached the end
+      // If fewer than requested, we got all of them
       if (posts.length < pageSize) break
-      skip += pageSize
+      skip += posts.length
+    } catch {
+      break
     }
-
-    return allPosts
-  } catch {
-    return fetchCreatorPostsPublic(influencerId)
   }
-}
 
-/** Fallback: public endpoint (lower quality) */
-async function fetchCreatorPostsPublic(influencerId: string): Promise<any[]> {
-  try {
-    const res = await fetch(`${API_BASE}/posts/getUserPost`, {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'content-type': 'application/json',
-        'x-off-country-code': 'IN',
-      },
-      body: JSON.stringify({
-        isLogin: 'false',
-        influencerId,
-        userId: '6144858b2f03d06a7dd008e4',
-        skip: 0,
-        limit: 200,
-        key: AUTH_KEY,
-      }),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return (data?.data ?? []).filter((p: any) => !p.isDeleted && !p.isHided)
-  } catch {
-    return []
-  }
+  return allPosts
 }
 
 Deno.serve(async (req) => {
@@ -135,7 +79,6 @@ Deno.serve(async (req) => {
     const offset = parseInt(url.searchParams.get('offset') || '0')
     const limit = parseInt(url.searchParams.get('limit') || '20')
 
-    // Fetch creators from DB
     const { data: creators, error, count } = await sb
       .from('creators')
       .select('official_id, username, name, profile_pic', { count: 'exact' })
@@ -151,10 +94,9 @@ Deno.serve(async (req) => {
       const batch = creators.slice(i, i + BATCH_SIZE)
       const batchResults = await Promise.allSettled(
         batch.map(async (c) => {
-          const posts = await fetchCreatorPostsHD(c.official_id)
+          const posts = await fetchAllCreatorPosts(c.official_id)
           if (posts.length === 0) return { creator: c.username, posts: 0, status: 'no_posts' }
 
-          // Upsert posts into DB
           const rows = posts.map((p: any) => ({
             official_id: p._id,
             creator_id: c.official_id,
