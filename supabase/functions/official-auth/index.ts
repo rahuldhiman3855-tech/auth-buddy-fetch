@@ -30,7 +30,9 @@ async function getAuthToken(): Promise<string> {
     body: JSON.stringify({
       email,
       password,
+      userType: 'user',
       key: 'd41d8cd98f00b204e9800998ecf8427e',
+      influencerUsername: 'pankhurikunall',
     }),
   });
 
