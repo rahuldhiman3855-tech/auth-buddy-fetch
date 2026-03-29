@@ -14,7 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      creators: {
+        Row: {
+          bio: string | null
+          category: string | null
+          cover_pic: string | null
+          discovered_at: string
+          follower_count: number | null
+          id: string
+          is_verified: boolean | null
+          name: string
+          official_id: string
+          post_count: number | null
+          profile_pic: string | null
+          updated_at: string
+          username: string
+          video_count: number | null
+        }
+        Insert: {
+          bio?: string | null
+          category?: string | null
+          cover_pic?: string | null
+          discovered_at?: string
+          follower_count?: number | null
+          id?: string
+          is_verified?: boolean | null
+          name?: string
+          official_id: string
+          post_count?: number | null
+          profile_pic?: string | null
+          updated_at?: string
+          username: string
+          video_count?: number | null
+        }
+        Update: {
+          bio?: string | null
+          category?: string | null
+          cover_pic?: string | null
+          discovered_at?: string
+          follower_count?: number | null
+          id?: string
+          is_verified?: boolean | null
+          name?: string
+          official_id?: string
+          post_count?: number | null
+          profile_pic?: string | null
+          updated_at?: string
+          username?: string
+          video_count?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

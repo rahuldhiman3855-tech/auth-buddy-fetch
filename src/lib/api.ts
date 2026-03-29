@@ -1,5 +1,5 @@
 import { OFFICIAL_API } from "./constants";
-
+import { supabase } from "@/integrations/supabase/client";
 const API_BASE = OFFICIAL_API.BASE_URL;
 const AUTH_PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/official-auth`;
 
@@ -167,4 +167,72 @@ export function formatCount(num: number | undefined): string {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
   if (num >= 1000) return (num / 1000).toFixed(1) + "K";
   return num.toString();
+}
+
+/** Save or update a creator in the local database */
+export async function saveCreatorToDB(data: InfluencerData): Promise<void> {
+  try {
+    await supabase.from("creators").upsert({
+      official_id: data._id,
+      username: data.username,
+      name: data.name || data.username,
+      profile_pic: data.userProfileImage || data.profilePic,
+      cover_pic: data.coverPic,
+      bio: data.userBio || data.bio,
+      category: data.category,
+      follower_count: data.followerCount || 0,
+      video_count: data.videoCount || 0,
+      post_count: data.postCount || 0,
+      is_verified: data.isVerified || false,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "official_id" });
+  } catch (e) {
+    console.error("Failed to save creator:", e);
+  }
+}
+
+export interface StoredCreator {
+  id: string;
+  official_id: string;
+  username: string;
+  name: string;
+  profile_pic: string | null;
+  cover_pic: string | null;
+  bio: string | null;
+  category: string | null;
+  follower_count: number;
+  video_count: number;
+  post_count: number;
+  is_verified: boolean;
+  discovered_at: string;
+  updated_at: string;
+}
+
+/** Get all stored creators from the database */
+export async function getStoredCreators(
+  offset = 0,
+  limit = 20
+): Promise<{ data: StoredCreator[]; count: number }> {
+  const { data, count, error } = await supabase
+    .from("creators")
+    .select("*", { count: "exact" })
+    .order("discovered_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) throw error;
+  return { data: (data as StoredCreator[]) ?? [], count: count ?? 0 };
+}
+
+/** Search and discover a creator, saving to DB */
+export async function discoverCreator(username: string): Promise<InfluencerData | null> {
+  try {
+    const data = await getInfluencer(username);
+    if (data?._id) {
+      await saveCreatorToDB(data);
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
