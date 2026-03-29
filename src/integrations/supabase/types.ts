@@ -65,6 +65,75 @@ export type Database = {
         }
         Relationships: []
       }
+      posts: {
+        Row: {
+          category: string | null
+          content: string | null
+          created_at: string | null
+          creator_id: string
+          creator_name: string | null
+          creator_profile_pic: string | null
+          creator_username: string | null
+          duration: number | null
+          file_size_mb: number | null
+          id: string
+          is_premium: boolean | null
+          like_count: number | null
+          location: string | null
+          media_url: string | null
+          official_id: string
+          post_date: string | null
+          price: number | null
+          thumbnail_url: string | null
+          type: string | null
+          view_count: number | null
+        }
+        Insert: {
+          category?: string | null
+          content?: string | null
+          created_at?: string | null
+          creator_id: string
+          creator_name?: string | null
+          creator_profile_pic?: string | null
+          creator_username?: string | null
+          duration?: number | null
+          file_size_mb?: number | null
+          id?: string
+          is_premium?: boolean | null
+          like_count?: number | null
+          location?: string | null
+          media_url?: string | null
+          official_id: string
+          post_date?: string | null
+          price?: number | null
+          thumbnail_url?: string | null
+          type?: string | null
+          view_count?: number | null
+        }
+        Update: {
+          category?: string | null
+          content?: string | null
+          created_at?: string | null
+          creator_id?: string
+          creator_name?: string | null
+          creator_profile_pic?: string | null
+          creator_username?: string | null
+          duration?: number | null
+          file_size_mb?: number | null
+          id?: string
+          is_premium?: boolean | null
+          like_count?: number | null
+          location?: string | null
+          media_url?: string | null
+          official_id?: string
+          post_date?: string | null
+          price?: number | null
+          thumbnail_url?: string | null
+          type?: string | null
+          view_count?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
