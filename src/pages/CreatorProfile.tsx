@@ -332,9 +332,8 @@ export default function CreatorProfile() {
               </button>
               <div className="rounded-xl overflow-hidden bg-black">
                 {(() => {
-                  const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
                   const mediaUrl = activePost.location || activePost.mediaUrl || '';
-                  const proxiedUrl = `${proxyBase}?url=${encodeURIComponent(mediaUrl)}`;
+                  const proxiedUrl = proxyUrl(mediaUrl);
                   if (activePost.type === "Video" && mediaUrl) {
                     return (
                       <video
