@@ -22,6 +22,7 @@ import {
   Clock,
   X,
   Download,
+  HardDrive,
 } from "lucide-react";
 
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
@@ -99,12 +100,25 @@ function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) =
           </button>
         )}
 
-        {/* Type badge */}
-        {post.type && (
-          <span className="absolute top-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-            {post.type}
-          </span>
-        )}
+        {/* Type & Quality badges */}
+        <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+          {post.type && (
+            <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+              {post.type}
+            </span>
+          )}
+          {post.fileSizeInMB && post.fileSizeInMB > 0 && (
+            <span className="flex items-center gap-1 rounded-md bg-emerald-600/80 px-2 py-0.5 text-[10px] font-semibold text-white">
+              <HardDrive className="h-2.5 w-2.5" />
+              {post.fileSizeInMB >= 1 ? `${post.fileSizeInMB.toFixed(1)} MB` : `${(post.fileSizeInMB * 1024).toFixed(0)} KB`}
+            </span>
+          )}
+          {post.fileSizeInMB && post.fileSizeInMB > 50 && (
+            <span className="rounded-md bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-white">
+              HD
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5 p-3">
