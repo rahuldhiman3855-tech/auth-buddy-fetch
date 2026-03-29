@@ -7,6 +7,7 @@ import {
   decodeContent,
   formatDuration,
   formatCount,
+  fetchPostMediaUrl,
   type PostData,
   type InfluencerData,
 } from "@/lib/api";
