@@ -467,44 +467,42 @@ export default function Index() {
       {activePost && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-          onClick={() => setActivePost(null)}
+          onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
         >
           <div className="relative w-full max-w-4xl mx-4" onClick={(e) => e.stopPropagation()}>
             <button
-              onClick={() => setActivePost(null)}
+              onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
               className="absolute -top-10 right-0 text-white hover:text-primary transition-colors"
             >
               <X className="h-6 w-6" />
             </button>
             <div className="rounded-xl overflow-hidden bg-black">
-              {(() => {
-                const mediaUrl = activePost.location || activePost.media_url || '';
-                const proxiedUrl = proxyUrl(mediaUrl);
-                if (activePost.type === "Video" && mediaUrl) {
-                  return (
-                    <video
-                      src={proxiedUrl}
-                      controls
-                      autoPlay
-                      className="w-full max-h-[80vh]"
-                      poster={proxyUrl(activePost.thumbnail_url)}
-                    />
-                  );
-                } else if (mediaUrl) {
-                  return (
-                    <img
-                      src={proxiedUrl}
-                      alt={activePost.content || ""}
-                      className="w-full max-h-[80vh] object-contain"
-                    />
-                  );
-                }
-                return (
-                  <div className="flex items-center justify-center py-32 text-muted-foreground">
-                    <p>No media available</p>
-                  </div>
-                );
-              })()}
+              {loadingMedia ? (
+                <div className="flex flex-col items-center justify-center py-32 text-white gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-white/70">Loading media...</p>
+                </div>
+              ) : activeMediaUrl ? (
+                activePost.type === "Video" ? (
+                  <video
+                    src={proxyUrl(activeMediaUrl)}
+                    controls
+                    autoPlay
+                    className="w-full max-h-[80vh]"
+                    poster={proxyUrl(activePost.thumbnail_url)}
+                  />
+                ) : (
+                  <img
+                    src={proxyUrl(activeMediaUrl)}
+                    alt={activePost.content || ""}
+                    className="w-full max-h-[80vh] object-contain"
+                  />
+                )
+              ) : (
+                <div className="flex items-center justify-center py-32 text-muted-foreground">
+                  <p>No media available</p>
+                </div>
+              )}
             </div>
             <div className="mt-3 flex items-center gap-3">
               {activePost.creator_profile_pic && (
@@ -515,7 +513,7 @@ export default function Index() {
                 <Link
                   to={`/creator/${activePost.creator_username || activePost.creator_id}`}
                   className="text-xs text-primary hover:underline"
-                  onClick={() => setActivePost(null)}
+                  onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
                 >
                   {activePost.creator_name || activePost.creator_username}
                 </Link>
