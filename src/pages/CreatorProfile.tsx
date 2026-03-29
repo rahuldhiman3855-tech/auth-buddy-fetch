@@ -187,7 +187,7 @@ export default function CreatorProfile() {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const profileImage = influencer?.userProfileImage || influencer?.profilePic || "";
+  const profileImage = proxyUrl(influencer?.userProfileImage || influencer?.profilePic);
   const bio = influencer?.userBio || influencer?.bio || "";
   const totalPosts = influencer?.videoCount || influencer?.postCount || posts?.length || 0;
 
@@ -342,7 +342,7 @@ export default function CreatorProfile() {
                         controls
                         autoPlay
                         className="w-full max-h-[80vh]"
-                        poster={activePost.thumbnailLocation || activePost.thumbnailUrl}
+                        poster={proxyUrl(activePost.thumbnailLocation || activePost.thumbnailUrl)}
                       />
                     );
                   } else if (mediaUrl) {
