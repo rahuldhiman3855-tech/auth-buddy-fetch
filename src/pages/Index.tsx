@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import SyncProgressPanel from "@/components/SyncProgressPanel";
 import { Link, useSearchParams } from "react-router-dom";
-import { formatCount, formatDuration, decodeContent } from "@/lib/api";
+import { formatCount, formatDuration, decodeContent, fetchPostMediaUrl } from "@/lib/api";
 import { getStoredPosts, getPostStats, type StoredPost } from "@/lib/postsApi";
 import {
   Search, Video, Image, Loader2, ChevronLeft, ChevronRight, RefreshCw,
