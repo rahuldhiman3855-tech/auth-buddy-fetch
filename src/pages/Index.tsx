@@ -201,6 +201,7 @@ export default function Index() {
                       <CheckCircle2 className="h-3 w-3" /> Visited
                     </span>
                   )}
+                  {c.cover_pic && (
                     <img src={c.cover_pic} alt="" className="w-full h-full object-cover" />
                   )}
                 </div>
@@ -245,7 +246,8 @@ export default function Index() {
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         )}
 
