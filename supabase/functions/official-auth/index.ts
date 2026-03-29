@@ -42,7 +42,7 @@ async function getAuthToken(): Promise<string> {
   }
 
   const data = await res.json();
-  const token = data?.data?.accessToken || data?.accessToken || data?.token;
+  const token = data?.savedUserData?.accessToken || data?.data?.accessToken || data?.accessToken || data?.token;
 
   if (!token) {
     throw new Error('No token in login response: ' + JSON.stringify(data));
