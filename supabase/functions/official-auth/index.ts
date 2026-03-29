@@ -3,54 +3,49 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Cache the auth token in memory
-let cachedToken: string | null = null;
-let tokenExpiry = 0;
+const API_BASE = 'https://api.official.me';
+const AUTH_KEY = 'd41d8cd98f00b204e9800998ecf8427e';
 
-async function getAuthToken(): Promise<string> {
+// Cache tokens by type
+const tokenCache: Record<string, { token: string; expiry: number }> = {};
+
+async function getToken(userType: 'user' | 'influencer' | 'agency'): Promise<string> {
   const now = Date.now();
-  if (cachedToken && now < tokenExpiry) {
-    return cachedToken;
-  }
+  const cached = tokenCache[userType];
+  if (cached && now < cached.expiry) return cached.token;
 
-  const email = 'dehad34999@exespay.com';
-  const password = 'Rdman@100%';
+  const accounts: Record<string, { email: string; password: string; username: string }> = {
+    user: { email: 'dehad34999@exespay.com', password: 'Rdman@100%', username: 'admin' },
+    influencer: { email: 'lovableadmin1@proton.me', password: 'Admin@12345', username: 'lovableadmin1' },
+    agency: { email: 'lovableagency1@proton.me', password: 'Admin@12345', username: 'lovableagency1' },
+  };
 
-  if (!email || !password) {
-    throw new Error('Admin credentials not configured');
-  }
+  const acc = accounts[userType];
+  const isInfluencer = userType === 'influencer';
 
-  const res = await fetch('https://api.official.me/doUserLoginOrSignup', {
+  // Use /login for influencer/agency, /doUserLoginOrSignup for user
+  const endpoint = isInfluencer || userType === 'agency'
+    ? `${API_BASE}/login`
+    : `${API_BASE}/doUserLoginOrSignup`;
+
+  const body = isInfluencer || userType === 'agency'
+    ? { email: acc.email, password: acc.password, influencerUsername: acc.username }
+    : { email: acc.email, password: acc.password, userType: 'user', key: AUTH_KEY, influencerUsername: acc.username };
+
+  const res = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'accept': 'application/json, text/plain, */*',
-      'content-type': 'application/json',
-      'x-off-country-code': 'IN',
-    },
-    body: JSON.stringify({
-      email,
-      password,
-      userType: 'user',
-      key: 'd41d8cd98f00b204e9800998ecf8427e',
-      influencerUsername: 'admin',
-    }),
+    headers: { 'accept': 'application/json', 'content-type': 'application/json', 'x-off-country-code': 'IN' },
+    body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Login failed [${res.status}]: ${text}`);
-  }
-
+  if (!res.ok) throw new Error(`Login failed [${res.status}]`);
   const data = await res.json();
-  const token = data?.savedUserData?.accessToken || data?.data?.accessToken || data?.accessToken || data?.token;
 
-  if (!token) {
-    throw new Error('No token in login response: ' + JSON.stringify(data));
-  }
+  const token = data?.accessToken || data?.savedUserData?.accessToken;
+  if (!token) throw new Error('No token in response');
 
-  cachedToken = token;
-  tokenExpiry = now + 55 * 60 * 1000; // 55 min cache
-  return cachedToken!;
+  tokenCache[userType] = { token, expiry: now + 50 * 60 * 1000 };
+  return token;
 }
 
 Deno.serve(async (req) => {
@@ -63,9 +58,9 @@ Deno.serve(async (req) => {
     const action = url.searchParams.get('action');
 
     if (action === 'token') {
-      // Return the cached/fresh token
-      const token = await getAuthToken();
-      return new Response(JSON.stringify({ token }), {
+      const type = (url.searchParams.get('type') || 'influencer') as 'user' | 'influencer' | 'agency';
+      const token = await getToken(type);
+      return new Response(JSON.stringify({ token, userType: type }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -79,21 +74,26 @@ Deno.serve(async (req) => {
       });
     }
 
-    const token = await getAuthToken();
+    // Determine which token to use based on endpoint
+    let tokenType: 'user' | 'influencer' | 'agency' = 'influencer';
+    const reqType = url.searchParams.get('auth');
+    if (reqType === 'user' || reqType === 'agency') tokenType = reqType;
+    if (apiPath.startsWith('/admin/')) tokenType = 'influencer'; // best we have
+
+    const token = await getToken(tokenType);
     const method = req.method;
     let body: string | undefined;
     if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
       body = await req.text();
     }
 
-    const apiRes = await fetch(`https://api.official.me${apiPath}`, {
+    const apiRes = await fetch(`${API_BASE}${apiPath}`, {
       method,
       headers: {
-        'accept': 'application/json, text/plain, */*',
+        'accept': 'application/json',
         'content-type': 'application/json',
         'x-off-country-code': 'IN',
-        'Authorization': `Bearer ${token}`,
-        'x-access-token': token,
+        'Authorization': `bearer ${token}`,
       },
       body,
     });
