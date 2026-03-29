@@ -19,6 +19,7 @@ import {
   Loader2,
   Clock,
   X,
+  Download,
 } from "lucide-react";
 
 function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) => void }) {
