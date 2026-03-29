@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import SyncProgressPanel from "@/components/SyncProgressPanel";
 import { Link, useSearchParams } from "react-router-dom";
-import { formatCount, formatDuration, decodeContent, fetchPostMediaUrl } from "@/lib/api";
+import { formatCount, formatDuration, decodeContent, fetchPageMediaUrls } from "@/lib/api";
 import { getStoredPosts, getPostStats, type StoredPost } from "@/lib/postsApi";
 import {
   Search, Video, Image, Loader2, ChevronLeft, ChevronRight, RefreshCw,
@@ -286,12 +286,13 @@ export default function Index() {
       setActiveMediaUrl(existingMedia);
       return;
     }
-    // Fetch on-demand
+    // Fetch page of media URLs for this creator
     setLoadingMedia(true);
     setActiveMediaUrl("");
-    const result = await fetchPostMediaUrl(post.creator_id, post.official_id);
-    if (result?.mediaUrl) {
-      setActiveMediaUrl(result.mediaUrl);
+    const map = await fetchPageMediaUrls(post.creator_id, 0, 50);
+    const found = map.get(post.official_id);
+    if (found?.mediaUrl) {
+      setActiveMediaUrl(found.mediaUrl);
     }
     setLoadingMedia(false);
   };
