@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Navbar from "@/components/Navbar";
 import { Link } from "react-router-dom";
 import { getStoredCreators, discoverCreator, bulkDiscoverCreators, formatCount, type StoredCreator } from "@/lib/api";
-import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
