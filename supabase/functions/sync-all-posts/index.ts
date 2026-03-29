@@ -25,11 +25,11 @@ function decodeContent(content?: string): string {
   }
 }
 
-/** Fetch ALL posts for a creator by paginating through getUserPost */
+/** Fetch ALL posts for a creator using isLogin:true for full access, paginating */
 async function fetchAllCreatorPosts(influencerId: string): Promise<any[]> {
   const allPosts: any[] = []
   let skip = 0
-  const pageSize = 100
+  const pageSize = 500
 
   while (true) {
     try {
@@ -41,7 +41,7 @@ async function fetchAllCreatorPosts(influencerId: string): Promise<any[]> {
           'x-off-country-code': 'IN',
         },
         body: JSON.stringify({
-          isLogin: 'false',
+          isLogin: 'true',
           influencerId,
           userId: ADMIN_USER_ID,
           skip,
@@ -54,7 +54,6 @@ async function fetchAllCreatorPosts(influencerId: string): Promise<any[]> {
       const posts = (data?.data ?? []).filter((p: any) => !p.isDeleted && !p.isHided)
       if (posts.length === 0) break
       allPosts.push(...posts)
-      // If fewer than requested, we got all of them
       if (posts.length < pageSize) break
       skip += posts.length
     } catch {
