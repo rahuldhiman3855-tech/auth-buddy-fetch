@@ -156,6 +156,8 @@ function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) =
 export default function CreatorProfile() {
   const { username } = useParams<{ username: string }>();
   const [activePost, setActivePost] = useState<PostData | null>(null);
+  const [activeMediaUrl, setActiveMediaUrl] = useState<string>("");
+  const [loadingMedia, setLoadingMedia] = useState(false);
 
   // Check if username is an ObjectID placeholder (hex string, 12 chars)
   const isObjectId = /^[a-f0-9]{12,24}$/.test(username || "");
