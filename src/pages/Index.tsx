@@ -62,6 +62,42 @@ export default function Index() {
     }
   };
 
+  const handleBatchSync = async () => {
+    setSyncing(true);
+    setSyncProgress("Starting...");
+    const BATCH = 50;
+    let offset = 0;
+    let totalProcessed = 0;
+    let total = totalCount;
+
+    try {
+      while (offset < total) {
+        setSyncProgress(`Scanning ${offset + 1}–${Math.min(offset + BATCH, total)} of ${total}...`);
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/batch-sync-posts?offset=${offset}&limit=${BATCH}`,
+          {
+            headers: {
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              "content-type": "application/json",
+            },
+          }
+        );
+        if (!res.ok) throw new Error(`Sync failed: ${res.status}`);
+        const data = await res.json();
+        total = data.total || total;
+        totalProcessed += data.processed || 0;
+        offset += BATCH;
+      }
+      toast({ title: "Sync complete!", description: `Updated post counts for ${totalProcessed} creators.` });
+      loadCreators(page);
+    } catch (e: any) {
+      toast({ title: "Sync error", description: e.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+      setSyncProgress("");
+    }
+  };
+
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
