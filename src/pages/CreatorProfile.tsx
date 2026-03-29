@@ -336,7 +336,7 @@ export default function CreatorProfile() {
               <div className="rounded-xl overflow-hidden bg-black">
                 {activePost.type === "Video" && (activePost.location || activePost.mediaUrl) ? (
                   <video
-                    src={activePost.location || activePost.mediaUrl}
+                    src={`${supabase.functions.url}/video-proxy?url=${encodeURIComponent(activePost.location || activePost.mediaUrl || '')}`}
                     controls
                     autoPlay
                     className="w-full max-h-[80vh]"
@@ -344,7 +344,7 @@ export default function CreatorProfile() {
                   />
                 ) : (activePost.location || activePost.mediaUrl) ? (
                   <img
-                    src={activePost.location || activePost.mediaUrl}
+                    src={`${supabase.functions.url}/video-proxy?url=${encodeURIComponent(activePost.location || activePost.mediaUrl || '')}`}
                     alt={decodeContent(activePost.content)}
                     className="w-full max-h-[80vh] object-contain"
                   />
