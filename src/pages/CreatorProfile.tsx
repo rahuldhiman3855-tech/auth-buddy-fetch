@@ -23,14 +23,17 @@ import {
   X,
 } from "lucide-react";
 
-function PostCard({ post, currencySymbol = "₹" }: { post: PostData; currencySymbol?: string }) {
+function PostCard({ post, currencySymbol = "₹", onPlay }: { post: PostData; currencySymbol?: string; onPlay: (post: PostData) => void }) {
   const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
   const title = decodeContent(post.content) || "Untitled";
   const isPrivate = post.category === "private";
   const duration = formatDuration(post.duration);
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-xl bg-card border border-border shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
+    <div
+      onClick={() => onPlay(post)}
+      className="group relative flex flex-col overflow-hidden rounded-xl bg-card border border-border shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+    >
       <div className="relative aspect-[3/4] overflow-hidden bg-muted">
         {thumb ? (
           <img
