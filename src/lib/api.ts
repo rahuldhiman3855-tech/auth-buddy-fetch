@@ -1,4 +1,7 @@
-const API_BASE = "https://api.official.me";
+import { OFFICIAL_API } from "./constants";
+
+const API_BASE = OFFICIAL_API.BASE_URL;
+const AUTH_PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/official-auth`;
 
 const defaultHeaders: Record<string, string> = {
   accept: "application/json, text/plain, */*",
@@ -18,6 +21,25 @@ async function apiFetch<T>(
     },
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+/** Make an authenticated API call through the auth proxy */
+async function authFetch<T>(
+  apiPath: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const method = options.method || "GET";
+  const url = `${AUTH_PROXY_BASE}?path=${encodeURIComponent(apiPath)}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      "content-type": "application/json",
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    },
+    body: options.body,
+  });
+  if (!res.ok) throw new Error(`Auth API error: ${res.status}`);
   return res.json();
 }
 
@@ -77,7 +99,7 @@ export interface PostData {
 }
 
 // Admin user ID with full access
-const ADMIN_USER_ID = "6144858b2f03d06a7dd008e4";
+const ADMIN_USER_ID = OFFICIAL_API.ADMIN_USER_ID;
 
 export async function getInfluencer(username: string): Promise<InfluencerData> {
   const res = await apiFetch<{ status: boolean; data: InfluencerData }>(`/influencer/${username}`);
@@ -97,10 +119,28 @@ export async function getInfluencerPosts(
       userId: ADMIN_USER_ID,
       skip,
       limit,
-      key: "d41d8cd98f00b204e9800998ecf8427e",
+      key: OFFICIAL_API.AUTH_KEY,
     }),
   });
   return res.data ?? [];
+}
+
+/** Get all posts using authenticated admin endpoint */
+export async function getAllPosts(
+  influencerId: string,
+  skip = 0,
+  limit = 8
+): Promise<PostData[]> {
+  try {
+    const res = await authFetch<{ status: boolean; data: PostData[] }>(
+      `/posts/getAllPost/${influencerId}/${skip}/${limit}`,
+      { method: "GET" }
+    );
+    return res.data ?? [];
+  } catch {
+    // Fallback to public endpoint
+    return getInfluencerPosts(influencerId, skip, limit);
+  }
 }
 
 /** Decode URL-encoded HTML content to plain text */
