@@ -285,7 +285,6 @@ export default function Index() {
 
   // Filter by search
   const filteredUnpinned = filterQuery.trim()
-  const filteredUnpinned = filterQuery.trim()
     ? unpinnedCreators.filter(
         (c) =>
           c.username.toLowerCase().includes(filterQuery.toLowerCase()) ||
