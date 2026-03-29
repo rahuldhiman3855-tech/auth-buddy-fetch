@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Navbar from "@/components/Navbar";
 import { Link } from "react-router-dom";
-import { getStoredCreators, discoverCreator, formatCount, type StoredCreator } from "@/lib/api";
+import { getStoredCreators, discoverCreator, bulkDiscoverCreators, formatCount, type StoredCreator } from "@/lib/api";
 import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,15 +37,8 @@ export default function Index() {
     }
   }, []);
 
-  // Seed creators on first visit if DB is empty
   useEffect(() => {
-    (async () => {
-      const { count } = await getStoredCreators(0, 1);
-      if (count === 0) {
-        await Promise.allSettled(SEED_USERNAMES.map(u => discoverCreator(u)));
-      }
-      loadCreators(0);
-    })();
+    loadCreators(0);
   }, [loadCreators]);
 
   const handlePageChange = (newPage: number) => {
