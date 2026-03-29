@@ -31,10 +31,8 @@ async function getAuthToken(): Promise<string> {
   const now = Date.now()
   if (cachedToken && now < tokenExpiry) return cachedToken
 
-  const email = Deno.env.get('OFFICIAL_ADMIN_EMAIL') || 'dehad34999@exespay.com'
-  const password = Deno.env.get('OFFICIAL_ADMIN_PASSWORD') || 'Rdman@100%'
-
-  const res = await fetch(`${API_BASE}/doUserLoginOrSignup`, {
+  // Use influencer login - required for getAllPost endpoint
+  const res = await fetch(`${API_BASE}/login`, {
     method: 'POST',
     headers: {
       'accept': 'application/json',
@@ -42,11 +40,9 @@ async function getAuthToken(): Promise<string> {
       'x-off-country-code': 'IN',
     },
     body: JSON.stringify({
-      email,
-      password,
-      userType: 'user',
-      key: AUTH_KEY,
-      influencerUsername: 'admin',
+      email: 'lovableadmin1@proton.me',
+      password: 'Admin@12345',
+      influencerUsername: 'lovableadmin1',
     }),
   })
 
