@@ -1,19 +1,35 @@
 import { useState, useEffect, useCallback } from "react";
 import Navbar from "@/components/Navbar";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { getStoredCreators, discoverCreator, bulkDiscoverCreators, formatCount, type StoredCreator } from "@/lib/api";
-import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight, RefreshCw, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 20;
 
+function getVisitedCreators(): Set<string> {
+  try {
+    const stored = localStorage.getItem("visited_creators");
+    return new Set(stored ? JSON.parse(stored) : []);
+  } catch { return new Set(); }
+}
+
+function markCreatorVisited(username: string) {
+  const visited = getVisitedCreators();
+  visited.add(username);
+  localStorage.setItem("visited_creators", JSON.stringify([...visited]));
+}
+
 
 export default function Index() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialPage = parseInt(searchParams.get("page") || "0", 10);
   const [creators, setCreators] = useState<StoredCreator[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(initialPage);
+  const [visitedSet, setVisitedSet] = useState<Set<string>>(getVisitedCreators);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -35,12 +51,18 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    loadCreators(0);
-  }, [loadCreators]);
+    loadCreators(initialPage);
+  }, [loadCreators, initialPage]);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
+    setSearchParams({ page: String(newPage) });
     loadCreators(newPage);
+  };
+
+  const handleCreatorClick = (username: string) => {
+    markCreatorVisited(username);
+    setVisitedSet(new Set(getVisitedCreators()));
   };
 
   const handleDiscover = async () => {
@@ -159,14 +181,26 @@ export default function Index() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {creators.map((c) => (
+            {creators.map((c) => {
+              const isVisited = visitedSet.has(c.username);
+              return (
               <Link
                 key={c.id}
                 to={`/creator/${c.username}`}
-                className="group rounded-xl border border-border bg-card hover:border-primary/50 hover:shadow-lg transition-all overflow-hidden"
+                onClick={() => handleCreatorClick(c.username)}
+                className={`group rounded-xl border overflow-hidden transition-all ${
+                  isVisited
+                    ? "border-primary/30 bg-primary/5 hover:border-primary/60 hover:shadow-lg"
+                    : "border-border bg-card hover:border-primary/50 hover:shadow-lg"
+                }`}
               >
                 {/* Cover */}
                 <div className="h-24 bg-gradient-to-br from-primary/20 to-accent/20 relative overflow-hidden">
+                  {isVisited && (
+                    <span className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-full bg-primary/90 px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                      <CheckCircle2 className="h-3 w-3" /> Visited
+                    </span>
+                  )}
                   {c.cover_pic && (
                     <img src={c.cover_pic} alt="" className="w-full h-full object-cover" />
                   )}
@@ -212,7 +246,8 @@ export default function Index() {
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         )}
 
