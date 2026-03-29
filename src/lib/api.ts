@@ -1,5 +1,5 @@
 import { OFFICIAL_API } from "./constants";
-
+import { supabase } from "@/integrations/supabase/client";
 const API_BASE = OFFICIAL_API.BASE_URL;
 const AUTH_PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/official-auth`;
 
