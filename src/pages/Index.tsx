@@ -442,7 +442,7 @@ export default function Index() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {posts.map((post) => (
-              <FeedPostCard key={post.id} post={post} onPlay={setActivePost} />
+              <FeedPostCard key={post.id} post={post} onPlay={handlePlayPost} />
             ))}
           </div>
         )}
