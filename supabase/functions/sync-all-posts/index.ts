@@ -25,7 +25,6 @@ function decodeContent(content?: string): string {
   }
 }
 
-/** Fetch ALL posts for a creator by paginating (API caps ~10 per response) */
 async function fetchAllCreatorPosts(influencerId: string): Promise<any[]> {
   const allPosts: any[] = []
   const seenIds = new Set<string>()
@@ -62,7 +61,6 @@ async function fetchAllCreatorPosts(influencerId: string): Promise<any[]> {
           newCount++
         }
       }
-      // If no new posts found, we've exhausted all pages
       if (newCount === 0) break
       skip += posts.length
     } catch {
@@ -95,15 +93,28 @@ Deno.serve(async (req) => {
 
     if (error) throw error
 
+    const totalCreators = count ?? 0
+    const runId = url.searchParams.get('run_id') || crypto.randomUUID()
+
+    // Insert initial progress row for this batch
+    await sb.from('sync_log').insert({
+      run_id: runId,
+      status: 'running',
+      message: `Starting batch: creators ${offset + 1}–${Math.min(offset + limit, totalCreators)}`,
+      creators_done: 0,
+      creators_total: totalCreators,
+    })
+
     let totalPosts = 0
     const results: { creator: string; posts: number; status: string }[] = []
+    let creatorsProcessed = 0
 
     for (let i = 0; i < creators.length; i += BATCH_SIZE) {
       const batch = creators.slice(i, i + BATCH_SIZE)
       const batchResults = await Promise.allSettled(
         batch.map(async (c) => {
           const posts = await fetchAllCreatorPosts(c.official_id)
-          if (posts.length === 0) return { creator: c.username, posts: 0, status: 'no_posts' }
+          if (posts.length === 0) return { creator: c.username, name: c.name, posts: 0, status: 'no_posts' }
 
           const rows = posts.map((p: any) => ({
             official_id: p._id,
@@ -131,33 +142,65 @@ Deno.serve(async (req) => {
             .upsert(rows, { onConflict: 'official_id' })
 
           if (upsertError) {
-            console.error(`Upsert error for ${c.username}:`, upsertError)
-            return { creator: c.username, posts: posts.length, status: 'upsert_error' }
+            return { creator: c.username, name: c.name, posts: posts.length, status: 'upsert_error' }
           }
 
-          return { creator: c.username, posts: posts.length, status: 'ok' }
+          return { creator: c.username, name: c.name, posts: posts.length, status: 'ok' }
         })
       )
 
       for (const r of batchResults) {
+        creatorsProcessed++
         if (r.status === 'fulfilled') {
           results.push(r.value)
           totalPosts += r.value.posts
+
+          // Write progress to sync_log for each creator
+          await sb.from('sync_log').insert({
+            run_id: runId,
+            creator_username: r.value.creator,
+            creator_name: r.value.name || r.value.creator,
+            posts_synced: r.value.posts,
+            status: r.value.status === 'ok' ? 'synced' : r.value.status,
+            message: r.value.status === 'ok' 
+              ? `Synced ${r.value.posts} posts from @${r.value.creator}`
+              : `${r.value.status} for @${r.value.creator}`,
+            creators_done: offset + creatorsProcessed,
+            creators_total: totalCreators,
+          })
         } else {
           results.push({ creator: 'unknown', posts: 0, status: 'failed' })
+          await sb.from('sync_log').insert({
+            run_id: runId,
+            status: 'failed',
+            message: `Failed to process creator`,
+            creators_done: offset + creatorsProcessed,
+            creators_total: totalCreators,
+          })
         }
       }
 
       if (i + BATCH_SIZE < creators.length) await sleep(DELAY_MS)
     }
 
+    // Final completion log
+    await sb.from('sync_log').insert({
+      run_id: runId,
+      status: 'batch_complete',
+      message: `Batch done: ${creatorsProcessed} creators, ${totalPosts} posts`,
+      creators_done: offset + creatorsProcessed,
+      creators_total: totalCreators,
+      posts_synced: totalPosts,
+    })
+
     return new Response(JSON.stringify({
       processed: results.length,
-      totalCreators: count,
+      totalCreators,
       totalPosts,
       offset,
       limit,
-      hasMore: offset + limit < (count ?? 0),
+      runId,
+      hasMore: offset + limit < totalCreators,
       results,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
