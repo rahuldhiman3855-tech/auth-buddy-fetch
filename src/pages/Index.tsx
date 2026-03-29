@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Navbar from "@/components/Navbar";
 import { Link, useSearchParams } from "react-router-dom";
 import { getStoredCreators, discoverCreator, bulkDiscoverCreators, formatCount, type StoredCreator } from "@/lib/api";
-import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, Pin, PinOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +22,125 @@ function markCreatorVisited(username: string) {
   localStorage.setItem("visited_creators", JSON.stringify([...visited]));
 }
 
+function getPinnedCreators(): string[] {
+  try {
+    const stored = localStorage.getItem("pinned_creators");
+    return stored ? JSON.parse(stored) : [];
+  } catch { return []; }
+}
+
+function togglePinCreator(username: string): string[] {
+  const pinned = getPinnedCreators();
+  const idx = pinned.indexOf(username);
+  if (idx >= 0) {
+    pinned.splice(idx, 1);
+  } else {
+    pinned.unshift(username);
+  }
+  localStorage.setItem("pinned_creators", JSON.stringify(pinned));
+  return pinned;
+}
+
+function CreatorCard({
+  c,
+  isVisited,
+  isPinned,
+  onPin,
+  onClick,
+}: {
+  c: StoredCreator;
+  isVisited: boolean;
+  isPinned: boolean;
+  onPin: (e: React.MouseEvent) => void;
+  onClick: () => void;
+}) {
+  return (
+    <div className="relative">
+      <Link
+        to={`/creator/${c.username}`}
+        onClick={onClick}
+        className={`group block rounded-xl border overflow-hidden transition-all ${
+          isPinned
+            ? "border-accent bg-accent/5 ring-2 ring-accent/30 hover:shadow-xl"
+            : isVisited
+            ? "border-primary/30 bg-primary/5 hover:border-primary/60 hover:shadow-lg"
+            : "border-border bg-card hover:border-primary/50 hover:shadow-lg"
+        }`}
+      >
+        {/* Cover */}
+        <div className="h-24 bg-gradient-to-br from-primary/20 to-accent/20 relative overflow-hidden">
+          {isPinned && (
+            <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-accent-foreground">
+              <Pin className="h-3 w-3" /> Pinned
+            </span>
+          )}
+          {isVisited && !isPinned && (
+            <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-full bg-primary/90 px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+              <CheckCircle2 className="h-3 w-3" /> Visited
+            </span>
+          )}
+          {c.cover_pic && (
+            <img src={c.cover_pic} alt="" className="w-full h-full object-cover" />
+          )}
+        </div>
+
+        {/* Profile */}
+        <div className="px-4 pb-4 -mt-8 relative">
+          <div className="h-16 w-16 rounded-full border-4 border-card bg-muted overflow-hidden">
+            {c.profile_pic ? (
+              <img src={c.profile_pic} alt={c.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xl font-bold text-muted-foreground">
+                {(c.name || c.username)[0]?.toUpperCase()}
+              </div>
+            )}
+          </div>
+
+          <h3 className="mt-2 font-bold text-foreground truncate group-hover:text-primary transition-colors">
+            {c.name || c.username}
+          </h3>
+          <p className="text-xs text-muted-foreground">@{c.username}</p>
+
+          {c.bio && (
+            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{c.bio}</p>
+          )}
+
+          <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+            {(c.follower_count || 0) > 0 && (
+              <span className="flex items-center gap-1">
+                <Eye className="h-3 w-3" />
+                {formatCount(c.follower_count)}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Video className="h-3 w-3" />
+              {formatCount(c.post_count || c.video_count || 0)} posts
+            </span>
+            {c.category && (
+              <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-primary text-[10px] font-medium">
+                {c.category}
+              </span>
+            )}
+          </div>
+        </div>
+      </Link>
+
+      {/* Pin button — floating on top-right of cover */}
+      <button
+        onClick={onPin}
+        className={`absolute top-2 right-2 z-20 flex h-7 w-7 items-center justify-center rounded-full transition-all ${
+          isPinned
+            ? "bg-accent text-accent-foreground shadow-md hover:bg-destructive hover:text-destructive-foreground"
+            : "bg-black/50 text-white opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-accent-foreground"
+        }`}
+        title={isPinned ? "Unpin creator" : "Pin creator"}
+      >
+        {isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  );
+}
+
 
 export default function Index() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,12 +149,16 @@ export default function Index() {
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(initialPage);
   const [visitedSet, setVisitedSet] = useState<Set<string>>(getVisitedCreators);
+  const [pinnedList, setPinnedList] = useState<string[]>(getPinnedCreators);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState("");
   const { toast } = useToast();
+
+  // Load ALL creators once so we can show pinned ones from any page
+  const [allCreators, setAllCreators] = useState<StoredCreator[]>([]);
 
   const loadCreators = useCallback(async (pageNum: number) => {
     setLoading(true);
@@ -50,9 +173,17 @@ export default function Index() {
     }
   }, []);
 
+  const loadAllCreators = useCallback(async () => {
+    try {
+      const { data } = await getStoredCreators(0, 1000);
+      setAllCreators(data);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     loadCreators(initialPage);
-  }, [loadCreators, initialPage]);
+    loadAllCreators();
+  }, [loadCreators, loadAllCreators, initialPage]);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
@@ -65,6 +196,18 @@ export default function Index() {
     setVisitedSet(new Set(getVisitedCreators()));
   };
 
+  const handlePin = (e: React.MouseEvent, username: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const updated = togglePinCreator(username);
+    setPinnedList([...updated]);
+    const isPinning = updated.includes(username);
+    toast({
+      title: isPinning ? "📌 Creator pinned!" : "Unpinned",
+      description: isPinning ? `${username} will appear at the top.` : `${username} removed from pins.`,
+    });
+  };
+
   const handleDiscover = async () => {
     const username = searchQuery.trim().toLowerCase();
     if (!username) return;
@@ -75,6 +218,7 @@ export default function Index() {
         toast({ title: "Creator found!", description: `${result.name || result.username} added to dashboard.` });
         setSearchQuery("");
         loadCreators(0);
+        loadAllCreators();
         setPage(0);
       } else {
         toast({ title: "Not found", description: `No creator with username "${username}"`, variant: "destructive" });
@@ -112,6 +256,7 @@ export default function Index() {
       }
       toast({ title: "Sync complete!", description: `Updated post counts for ${totalProcessed} creators.` });
       loadCreators(page);
+      loadAllCreators();
     } catch (e: any) {
       toast({ title: "Sync error", description: e.message, variant: "destructive" });
     } finally {
@@ -121,6 +266,15 @@ export default function Index() {
   };
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  // Build pinned creators list from allCreators
+  const pinnedSet = new Set(pinnedList);
+  const pinnedCreators = pinnedList
+    .map((username) => allCreators.find((c) => c.username === username))
+    .filter(Boolean) as StoredCreator[];
+
+  // Filter pinned out of the current page list to avoid duplicates
+  const unpinnedCreators = creators.filter((c) => !pinnedSet.has(c.username));
 
   return (
     <div className="min-h-screen bg-background">
@@ -135,7 +289,7 @@ export default function Index() {
               All Creators
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {totalCount} creators discovered • Search to add more
+              {totalCount} creators discovered • {pinnedList.length} pinned
             </p>
           </div>
 
@@ -170,85 +324,59 @@ export default function Index() {
           </Button>
         </div>
 
+        {/* Pinned Creators Section */}
+        {pinnedCreators.length > 0 && (
+          <section>
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5 mb-3">
+              <Pin className="h-4 w-4 text-accent" />
+              Pinned Creators ({pinnedCreators.length})
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {pinnedCreators.map((c) => (
+                <CreatorCard
+                  key={`pin-${c.id}`}
+                  c={c}
+                  isVisited={visitedSet.has(c.username)}
+                  isPinned={true}
+                  onPin={(e) => handlePin(e, c.username)}
+                  onClick={() => handleCreatorClick(c.username)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* All Creators */}
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : creators.length === 0 ? (
+        ) : unpinnedCreators.length === 0 && pinnedCreators.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>No creators yet. Search for a username to add one.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {creators.map((c) => {
-              const isVisited = visitedSet.has(c.username);
-              return (
-              <Link
-                key={c.id}
-                to={`/creator/${c.username}`}
-                onClick={() => handleCreatorClick(c.username)}
-                className={`group rounded-xl border overflow-hidden transition-all ${
-                  isVisited
-                    ? "border-primary/30 bg-primary/5 hover:border-primary/60 hover:shadow-lg"
-                    : "border-border bg-card hover:border-primary/50 hover:shadow-lg"
-                }`}
-              >
-                {/* Cover */}
-                <div className="h-24 bg-gradient-to-br from-primary/20 to-accent/20 relative overflow-hidden">
-                  {isVisited && (
-                    <span className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-full bg-primary/90 px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
-                      <CheckCircle2 className="h-3 w-3" /> Visited
-                    </span>
-                  )}
-                  {c.cover_pic && (
-                    <img src={c.cover_pic} alt="" className="w-full h-full object-cover" />
-                  )}
-                </div>
-
-                {/* Profile */}
-                <div className="px-4 pb-4 -mt-8 relative">
-                  <div className="h-16 w-16 rounded-full border-4 border-card bg-muted overflow-hidden">
-                    {c.profile_pic ? (
-                      <img src={c.profile_pic} alt={c.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xl font-bold text-muted-foreground">
-                        {(c.name || c.username)[0]?.toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-
-                  <h3 className="mt-2 font-bold text-foreground truncate group-hover:text-primary transition-colors">
-                    {c.name || c.username}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">@{c.username}</p>
-
-                  {c.bio && (
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{c.bio}</p>
-                  )}
-
-                  <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-                    {(c.follower_count || 0) > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Eye className="h-3 w-3" />
-                        {formatCount(c.follower_count)}
-                      </span>
-                    )}
-                    <span className="flex items-center gap-1">
-                      <Video className="h-3 w-3" />
-                      {formatCount(c.post_count || c.video_count || 0)} posts
-                    </span>
-                    {c.category && (
-                      <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-primary text-[10px] font-medium">
-                        {c.category}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-              );
-            })}
-          </div>
+          <>
+            {pinnedCreators.length > 0 && (
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                All Creators
+              </h2>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {unpinnedCreators.map((c) => (
+                <CreatorCard
+                  key={c.id}
+                  c={c}
+                  isVisited={visitedSet.has(c.username)}
+                  isPinned={false}
+                  onPin={(e) => handlePin(e, c.username)}
+                  onClick={() => handleCreatorClick(c.username)}
+                />
+              ))}
+            </div>
+          </>
         )}
 
         {/* Pagination */}
