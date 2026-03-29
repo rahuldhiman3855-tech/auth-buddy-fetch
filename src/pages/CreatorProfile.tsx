@@ -22,8 +22,14 @@ import {
   Download,
 } from "lucide-react";
 
+const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
+function proxyUrl(url?: string): string {
+  if (!url) return "";
+  return `${PROXY_BASE}?url=${encodeURIComponent(url)}`;
+}
+
 function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) => void }) {
-  const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
+  const thumb = proxyUrl(post.thumbnailLocation || post.thumbnailUrl);
   const title = decodeContent(post.content) || "Untitled";
   const isPrivate = post.category === "private";
   const duration = formatDuration(post.duration);
@@ -181,7 +187,7 @@ export default function CreatorProfile() {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const profileImage = influencer?.userProfileImage || influencer?.profilePic || "";
+  const profileImage = proxyUrl(influencer?.userProfileImage || influencer?.profilePic);
   const bio = influencer?.userBio || influencer?.bio || "";
   const totalPosts = influencer?.videoCount || influencer?.postCount || posts?.length || 0;
 
@@ -326,9 +332,8 @@ export default function CreatorProfile() {
               </button>
               <div className="rounded-xl overflow-hidden bg-black">
                 {(() => {
-                  const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
                   const mediaUrl = activePost.location || activePost.mediaUrl || '';
-                  const proxiedUrl = `${proxyBase}?url=${encodeURIComponent(mediaUrl)}`;
+                  const proxiedUrl = proxyUrl(mediaUrl);
                   if (activePost.type === "Video" && mediaUrl) {
                     return (
                       <video
@@ -336,7 +341,7 @@ export default function CreatorProfile() {
                         controls
                         autoPlay
                         className="w-full max-h-[80vh]"
-                        poster={activePost.thumbnailLocation || activePost.thumbnailUrl}
+                        poster={proxyUrl(activePost.thumbnailLocation || activePost.thumbnailUrl)}
                       />
                     );
                   } else if (mediaUrl) {
