@@ -145,16 +145,24 @@ export default function CreatorProfile() {
   // Check if username is an ObjectID placeholder (hex string, 12 chars)
   const isObjectId = /^[a-f0-9]{12,24}$/.test(username || "");
 
-  // For ObjectID usernames, load from DB
+  // For ObjectID usernames, load from DB (check both username and official_id)
   const { data: dbCreator } = useQuery({
     queryKey: ["db-creator", username],
     queryFn: async () => {
-      const { data } = await supabase
+      // Try by username first
+      const { data: byUsername } = await supabase
         .from("creators")
         .select("*")
         .eq("username", username!)
         .single();
-      return data;
+      if (byUsername) return byUsername;
+      // Fallback: try by official_id
+      const { data: byOfficialId } = await supabase
+        .from("creators")
+        .select("*")
+        .eq("official_id", username!)
+        .single();
+      return byOfficialId;
     },
     enabled: !!username && isObjectId,
   });
