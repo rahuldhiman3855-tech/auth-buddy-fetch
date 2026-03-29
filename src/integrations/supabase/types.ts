@@ -134,6 +134,45 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_log: {
+        Row: {
+          created_at: string | null
+          creator_name: string | null
+          creator_username: string | null
+          creators_done: number | null
+          creators_total: number | null
+          id: string
+          message: string | null
+          posts_synced: number | null
+          run_id: string
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          creator_name?: string | null
+          creator_username?: string | null
+          creators_done?: number | null
+          creators_total?: number | null
+          id?: string
+          message?: string | null
+          posts_synced?: number | null
+          run_id: string
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          creator_name?: string | null
+          creator_username?: string | null
+          creators_done?: number | null
+          creators_total?: number | null
+          id?: string
+          message?: string | null
+          posts_synced?: number | null
+          run_id?: string
+          status?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
