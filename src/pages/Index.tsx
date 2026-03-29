@@ -155,6 +155,7 @@ export default function Index() {
   const [searching, setSearching] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState("");
+  const [filterQuery, setFilterQuery] = useState("");
   const { toast } = useToast();
 
   // Load ALL creators once so we can show pinned ones from any page
