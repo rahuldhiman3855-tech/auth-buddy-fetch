@@ -22,8 +22,14 @@ import {
   Download,
 } from "lucide-react";
 
+const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
+function proxyUrl(url?: string): string {
+  if (!url) return "";
+  return `${PROXY_BASE}?url=${encodeURIComponent(url)}`;
+}
+
 function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) => void }) {
-  const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
+  const thumb = proxyUrl(post.thumbnailLocation || post.thumbnailUrl);
   const title = decodeContent(post.content) || "Untitled";
   const isPrivate = post.category === "private";
   const duration = formatDuration(post.duration);
