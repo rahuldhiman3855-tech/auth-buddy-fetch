@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Navbar from "@/components/Navbar";
 import { Link, useSearchParams } from "react-router-dom";
 import { getStoredCreators, discoverCreator, bulkDiscoverCreators, formatCount, type StoredCreator } from "@/lib/api";
-import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, Pin, PinOff } from "lucide-react";
+import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, Pin, PinOff, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -155,6 +155,7 @@ export default function Index() {
   const [searching, setSearching] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState("");
+  const [filterQuery, setFilterQuery] = useState("");
   const { toast } = useToast();
 
   // Load ALL creators once so we can show pinned ones from any page
@@ -273,8 +274,32 @@ export default function Index() {
     .map((username) => allCreators.find((c) => c.username === username))
     .filter(Boolean) as StoredCreator[];
 
-  // Filter pinned out of the current page list to avoid duplicates
-  const unpinnedCreators = creators.filter((c) => !pinnedSet.has(c.username));
+  // Filter pinned out, then sort visited to the bottom
+  const unpinnedCreators = creators
+    .filter((c) => !pinnedSet.has(c.username))
+    .sort((a, b) => {
+      const aVisited = visitedSet.has(a.username) ? 1 : 0;
+      const bVisited = visitedSet.has(b.username) ? 1 : 0;
+      return aVisited - bVisited;
+    });
+
+  // Filter by search
+  const filteredUnpinned = filterQuery.trim()
+    ? unpinnedCreators.filter(
+        (c) =>
+          c.username.toLowerCase().includes(filterQuery.toLowerCase()) ||
+          (c.name || "").toLowerCase().includes(filterQuery.toLowerCase()) ||
+          (c.category || "").toLowerCase().includes(filterQuery.toLowerCase())
+      )
+    : unpinnedCreators;
+  const filteredPinned = filterQuery.trim()
+    ? pinnedCreators.filter(
+        (c) =>
+          c.username.toLowerCase().includes(filterQuery.toLowerCase()) ||
+          (c.name || "").toLowerCase().includes(filterQuery.toLowerCase()) ||
+          (c.category || "").toLowerCase().includes(filterQuery.toLowerCase())
+      )
+    : pinnedCreators;
 
   return (
     <div className="min-h-screen bg-background">
@@ -324,15 +349,26 @@ export default function Index() {
           </Button>
         </div>
 
+        {/* Filter creators */}
+        <div className="relative">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Filter creators by name, username, or category..."
+            value={filterQuery}
+            onChange={(e) => setFilterQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
         {/* Pinned Creators Section */}
-        {pinnedCreators.length > 0 && (
+        {filteredPinned.length > 0 && (
           <section>
             <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5 mb-3">
               <Pin className="h-4 w-4 text-accent" />
-              Pinned Creators ({pinnedCreators.length})
+              Pinned Creators ({filteredPinned.length})
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {pinnedCreators.map((c) => (
+              {filteredPinned.map((c) => (
                 <CreatorCard
                   key={`pin-${c.id}`}
                   c={c}
@@ -351,21 +387,21 @@ export default function Index() {
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : unpinnedCreators.length === 0 && pinnedCreators.length === 0 ? (
+        ) : filteredUnpinned.length === 0 && filteredPinned.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>No creators yet. Search for a username to add one.</p>
+            <p>{filterQuery.trim() ? "No creators match your filter." : "No creators yet. Search for a username to add one."}</p>
           </div>
         ) : (
           <>
-            {pinnedCreators.length > 0 && (
+            {filteredPinned.length > 0 && (
               <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
                 <Users className="h-4 w-4 text-muted-foreground" />
                 All Creators
               </h2>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {unpinnedCreators.map((c) => (
+              {filteredUnpinned.map((c) => (
                 <CreatorCard
                   key={c.id}
                   c={c}
