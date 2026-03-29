@@ -25,11 +25,11 @@ function decodeContent(content?: string): string {
   }
 }
 
-/** Fetch ALL posts for a creator using isLogin:true for full access, paginating */
+/** Fetch ALL posts for a creator by paginating (API caps ~10 per response) */
 async function fetchAllCreatorPosts(influencerId: string): Promise<any[]> {
   const allPosts: any[] = []
+  const seenIds = new Set<string>()
   let skip = 0
-  const pageSize = 500
 
   while (true) {
     try {
@@ -41,11 +41,11 @@ async function fetchAllCreatorPosts(influencerId: string): Promise<any[]> {
           'x-off-country-code': 'IN',
         },
         body: JSON.stringify({
-          isLogin: 'true',
+          isLogin: 'false',
           influencerId,
           userId: ADMIN_USER_ID,
           skip,
-          limit: pageSize,
+          limit: 500,
           key: AUTH_KEY,
         }),
       })
@@ -53,8 +53,17 @@ async function fetchAllCreatorPosts(influencerId: string): Promise<any[]> {
       const data = await res.json()
       const posts = (data?.data ?? []).filter((p: any) => !p.isDeleted && !p.isHided)
       if (posts.length === 0) break
-      allPosts.push(...posts)
-      if (posts.length < pageSize) break
+
+      let newCount = 0
+      for (const p of posts) {
+        if (!seenIds.has(p._id)) {
+          seenIds.add(p._id)
+          allPosts.push(p)
+          newCount++
+        }
+      }
+      // If no new posts found, we've exhausted all pages
+      if (newCount === 0) break
       skip += posts.length
     } catch {
       break
