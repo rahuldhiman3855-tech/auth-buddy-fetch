@@ -261,14 +261,3 @@ export async function discoverCreator(username: string): Promise<InfluencerData 
     return null;
   }
 }
-  try {
-    const data = await getInfluencer(username);
-    if (data?._id) {
-      await saveCreatorToDB(data);
-      return data;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
