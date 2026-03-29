@@ -273,8 +273,33 @@ export default function Index() {
     .map((username) => allCreators.find((c) => c.username === username))
     .filter(Boolean) as StoredCreator[];
 
-  // Filter pinned out of the current page list to avoid duplicates
-  const unpinnedCreators = creators.filter((c) => !pinnedSet.has(c.username));
+  // Filter pinned out, then sort visited to the bottom
+  const unpinnedCreators = creators
+    .filter((c) => !pinnedSet.has(c.username))
+    .sort((a, b) => {
+      const aVisited = visitedSet.has(a.username) ? 1 : 0;
+      const bVisited = visitedSet.has(b.username) ? 1 : 0;
+      return aVisited - bVisited;
+    });
+
+  // Filter by search
+  const [filterQuery, setFilterQuery] = useState("");
+  const filteredUnpinned = filterQuery.trim()
+    ? unpinnedCreators.filter(
+        (c) =>
+          c.username.toLowerCase().includes(filterQuery.toLowerCase()) ||
+          (c.name || "").toLowerCase().includes(filterQuery.toLowerCase()) ||
+          (c.category || "").toLowerCase().includes(filterQuery.toLowerCase())
+      )
+    : unpinnedCreators;
+  const filteredPinned = filterQuery.trim()
+    ? pinnedCreators.filter(
+        (c) =>
+          c.username.toLowerCase().includes(filterQuery.toLowerCase()) ||
+          (c.name || "").toLowerCase().includes(filterQuery.toLowerCase()) ||
+          (c.category || "").toLowerCase().includes(filterQuery.toLowerCase())
+      )
+    : pinnedCreators;
 
   return (
     <div className="min-h-screen bg-background">
