@@ -13,8 +13,8 @@ async function getAuthToken(): Promise<string> {
     return cachedToken;
   }
 
-  const email = Deno.env.get('OFFICIAL_ADMIN_EMAIL');
-  const password = Deno.env.get('OFFICIAL_ADMIN_PASSWORD');
+  const email = Deno.env.get('OFFICIAL_ADMIN_EMAIL') || 'dehad34999@exespay.com';
+  const password = Deno.env.get('OFFICIAL_ADMIN_PASSWORD') || 'Rdman@100%';
 
   if (!email || !password) {
     throw new Error('Admin credentials not configured');
