@@ -196,7 +196,11 @@ export default function Index() {
               >
                 {/* Cover */}
                 <div className="h-24 bg-gradient-to-br from-primary/20 to-accent/20 relative overflow-hidden">
-                  {c.cover_pic && (
+                  {isVisited && (
+                    <span className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-full bg-primary/90 px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                      <CheckCircle2 className="h-3 w-3" /> Visited
+                    </span>
+                  )}
                     <img src={c.cover_pic} alt="" className="w-full h-full object-cover" />
                   )}
                 </div>
