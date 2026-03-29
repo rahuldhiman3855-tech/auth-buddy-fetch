@@ -8,7 +8,9 @@ import {
   formatDuration,
   formatCount,
   type PostData,
+  type InfluencerData,
 } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import {
   BadgeCheck,
