@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
+import { useRef, useCallback, useEffect } from "react";
 import {
   getInfluencer,
   getInfluencerPosts,
@@ -130,14 +131,43 @@ export default function CreatorProfile() {
     enabled: !!username,
   });
 
+  const PAGE_SIZE = 20;
+
   const {
-    data: posts,
+    data: postsData,
     isLoading: loadingPosts,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["posts", influencer?._id],
-    queryFn: () => getInfluencerPosts(influencer!._id),
+    queryFn: ({ pageParam = 0 }) => getInfluencerPosts(influencer!._id, pageParam, PAGE_SIZE),
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.length < PAGE_SIZE) return undefined;
+      return allPages.reduce((sum, page) => sum + page.length, 0);
+    },
+    initialPageParam: 0,
     enabled: !!influencer?._id,
   });
+
+  const posts = postsData?.pages.flat() ?? [];
+
+  // Intersection observer for infinite scroll
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const profileImage = influencer?.userProfileImage || influencer?.profilePic || "";
   const bio = influencer?.userBio || influencer?.bio || "";
@@ -242,7 +272,7 @@ export default function CreatorProfile() {
             {/* Posts */}
             <section className="mt-8">
               <h2 className="text-lg font-bold text-foreground mb-4">
-                📺 Videos & Posts ({posts?.length ?? 0})
+                📺 Videos & Posts ({posts.length})
               </h2>
 
               {loadingPosts && (
@@ -251,14 +281,26 @@ export default function CreatorProfile() {
                 </div>
               )}
 
-              {posts && posts.length > 0 ? (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                  {posts
-                    .filter((p) => !p.isDeleted && !p.isHided)
-                    .map((post) => (
-                      <PostCard key={post._id} post={post} />
-                    ))}
-                </div>
+              {posts.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                    {posts
+                      .filter((p) => !p.isDeleted && !p.isHided)
+                      .map((post) => (
+                        <PostCard key={post._id} post={post} />
+                      ))}
+                  </div>
+
+                  {/* Infinite scroll trigger */}
+                  <div ref={loadMoreRef} className="flex items-center justify-center py-8">
+                    {isFetchingNextPage && (
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    )}
+                    {!hasNextPage && posts.length > PAGE_SIZE && (
+                      <p className="text-xs text-muted-foreground">No more posts</p>
+                    )}
+                  </div>
+                </>
               ) : (
                 !loadingPosts && (
                   <div className="flex flex-col items-center py-16 text-muted-foreground">
