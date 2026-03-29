@@ -125,6 +125,24 @@ export async function getInfluencerPosts(
   return res.data ?? [];
 }
 
+/** Get all posts using authenticated admin endpoint */
+export async function getAllPosts(
+  influencerId: string,
+  skip = 0,
+  limit = 8
+): Promise<PostData[]> {
+  try {
+    const res = await authFetch<{ status: boolean; data: PostData[] }>(
+      `/posts/getAllPost/${influencerId}/${skip}/${limit}`,
+      { method: "GET" }
+    );
+    return res.data ?? [];
+  } catch {
+    // Fallback to public endpoint
+    return getInfluencerPosts(influencerId, skip, limit);
+  }
+}
+
 /** Decode URL-encoded HTML content to plain text */
 export function decodeContent(content?: string): string {
   if (!content) return "";
