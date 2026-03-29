@@ -7,7 +7,7 @@ import {
   decodeContent,
   formatDuration,
   formatCount,
-  fetchPostMediaUrl,
+  fetchPageMediaUrls,
   type PostData,
   type InfluencerData,
 } from "@/lib/api";
@@ -158,6 +158,7 @@ export default function CreatorProfile() {
   const [activePost, setActivePost] = useState<PostData | null>(null);
   const [activeMediaUrl, setActiveMediaUrl] = useState<string>("");
   const [loadingMedia, setLoadingMedia] = useState(false);
+  const [mediaCache, setMediaCache] = useState<Map<string, { mediaUrl: string; thumbnailUrl: string }>>(new Map());
 
   // Check if username is an ObjectID placeholder (hex string, 12 chars)
   const isObjectId = /^[a-f0-9]{12,24}$/.test(username || "");
@@ -234,6 +235,23 @@ export default function CreatorProfile() {
   });
 
   const posts = postsData?.pages.flat() ?? [];
+
+  // Batch-fetch media URLs for all loaded posts that are missing media
+  useEffect(() => {
+    if (!influencerId || posts.length === 0) return;
+    const missing = posts.filter(p => !p.location && !p.mediaUrl && !mediaCache.has(p._id));
+    if (missing.length === 0) return;
+    
+    fetchPageMediaUrls(influencerId, 0, 50).then(map => {
+      if (map.size > 0) {
+        setMediaCache(prev => {
+          const next = new Map(prev);
+          map.forEach((v, k) => next.set(k, v));
+          return next;
+        });
+      }
+    });
+  }, [influencerId, posts.length]);
 
   // Update creator post count in DB when posts are loaded
   useEffect(() => {
@@ -371,15 +389,21 @@ export default function CreatorProfile() {
                       .map((post) => (
                         <PostCard key={post._id} post={post} onPlay={async (p) => {
                           setActivePost(p);
-                          const media = p.location || p.mediaUrl;
+                          // Check direct post data first, then cache
+                          const media = p.location || p.mediaUrl || mediaCache.get(p._id)?.mediaUrl;
                           if (media) {
                             setActiveMediaUrl(media);
                             return;
                           }
+                          // Fallback: fetch individually
                           setLoadingMedia(true);
                           setActiveMediaUrl("");
-                          const result = await fetchPostMediaUrl(influencerId!, p._id);
-                          if (result?.mediaUrl) setActiveMediaUrl(result.mediaUrl);
+                          const map = await fetchPageMediaUrls(influencerId!, 0, 50);
+                          const found = map.get(p._id);
+                          if (found?.mediaUrl) {
+                            setActiveMediaUrl(found.mediaUrl);
+                            setMediaCache(prev => { const n = new Map(prev); n.set(p._id, found); return n; });
+                          }
                           setLoadingMedia(false);
                         }} />
                       ))}
