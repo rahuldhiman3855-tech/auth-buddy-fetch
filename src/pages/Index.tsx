@@ -361,14 +361,14 @@ export default function Index() {
         </div>
 
         {/* Pinned Creators Section */}
-        {pinnedCreators.length > 0 && (
+        {filteredPinned.length > 0 && (
           <section>
             <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5 mb-3">
               <Pin className="h-4 w-4 text-accent" />
-              Pinned Creators ({pinnedCreators.length})
+              Pinned Creators ({filteredPinned.length})
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {pinnedCreators.map((c) => (
+              {filteredPinned.map((c) => (
                 <CreatorCard
                   key={`pin-${c.id}`}
                   c={c}
@@ -387,21 +387,21 @@ export default function Index() {
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : unpinnedCreators.length === 0 && pinnedCreators.length === 0 ? (
+        ) : filteredUnpinned.length === 0 && filteredPinned.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>No creators yet. Search for a username to add one.</p>
+            <p>{filterQuery.trim() ? "No creators match your filter." : "No creators yet. Search for a username to add one."}</p>
           </div>
         ) : (
           <>
-            {pinnedCreators.length > 0 && (
+            {filteredPinned.length > 0 && (
               <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
                 <Users className="h-4 w-4 text-muted-foreground" />
                 All Creators
               </h2>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {unpinnedCreators.map((c) => (
+              {filteredUnpinned.map((c) => (
                 <CreatorCard
                   key={c.id}
                   c={c}
