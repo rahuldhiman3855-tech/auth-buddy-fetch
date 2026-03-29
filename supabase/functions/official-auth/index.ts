@@ -13,8 +13,8 @@ async function getAuthToken(): Promise<string> {
     return cachedToken;
   }
 
-  const email = Deno.env.get('OFFICIAL_ADMIN_EMAIL');
-  const password = Deno.env.get('OFFICIAL_ADMIN_PASSWORD');
+  const email = 'dehad34999@exespay.com';
+  const password = 'Rdman@100%';
 
   if (!email || !password) {
     throw new Error('Admin credentials not configured');
@@ -32,7 +32,7 @@ async function getAuthToken(): Promise<string> {
       password,
       userType: 'user',
       key: 'd41d8cd98f00b204e9800998ecf8427e',
-      influencerUsername: 'pankhurikunall',
+      influencerUsername: 'admin',
     }),
   });
 
