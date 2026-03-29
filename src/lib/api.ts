@@ -1,7 +1,8 @@
 import { OFFICIAL_API } from "./constants";
 import { supabase } from "@/integrations/supabase/client";
+
 const API_BASE = OFFICIAL_API.BASE_URL;
-const AUTH_PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/official-auth`;
+const ADMIN_USER_ID = OFFICIAL_API.ADMIN_USER_ID;
 
 const defaultHeaders: Record<string, string> = {
   accept: "application/json, text/plain, */*",
@@ -9,37 +10,12 @@ const defaultHeaders: Record<string, string> = {
   "x-off-country-code": "IN",
 };
 
-async function apiFetch<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
+    headers: { ...defaultHeaders, ...options.headers },
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
-/** Make an authenticated API call through the auth proxy */
-async function authFetch<T>(
-  apiPath: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const method = options.method || "GET";
-  const url = `${AUTH_PROXY_BASE}?path=${encodeURIComponent(apiPath)}`;
-  const res = await fetch(url, {
-    method,
-    headers: {
-      "content-type": "application/json",
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    },
-    body: options.body,
-  });
-  if (!res.ok) throw new Error(`Auth API error: ${res.status}`);
   return res.json();
 }
 
@@ -75,12 +51,12 @@ export interface InfluencerData {
 
 export interface PostData {
   _id: string;
-  content?: string; // URL-encoded HTML
-  category?: string; // "private" | "public"
-  type?: string; // "Video" | "Image"
+  content?: string;
+  category?: string;
+  type?: string;
   price?: number;
-  duration?: number; // in seconds
-  location?: string; // video URL
+  duration?: number;
+  location?: string;
   thumbnailLocation?: string;
   mediaUrl?: string;
   thumbnailUrl?: string;
@@ -98,20 +74,18 @@ export interface PostData {
   [key: string]: unknown;
 }
 
-// Admin user ID with full access
-const ADMIN_USER_ID = OFFICIAL_API.ADMIN_USER_ID;
-
 export async function getInfluencer(username: string): Promise<InfluencerData> {
   const res = await apiFetch<{ status: boolean; data: InfluencerData }>(`/influencer/${username}`);
   return res.data;
 }
 
+/** Fetch posts using unauthenticated endpoint (returns media URLs) */
 export async function getInfluencerPosts(
   influencerId: string,
   skip = 0,
-  limit = 20
+  limit = 10
 ): Promise<PostData[]> {
-  const res = await apiFetch<{ status: boolean; data: PostData[]; currencySymbol?: string }>("/posts/getUserPost", {
+  const res = await apiFetch<{ status: boolean; data: PostData[] }>("/posts/getUserPost", {
     method: "POST",
     body: JSON.stringify({
       isLogin: "false",
@@ -123,24 +97,6 @@ export async function getInfluencerPosts(
     }),
   });
   return res.data ?? [];
-}
-
-/** Get all posts using authenticated admin endpoint */
-export async function getAllPosts(
-  influencerId: string,
-  skip = 0,
-  limit = 8
-): Promise<PostData[]> {
-  try {
-    const res = await authFetch<{ status: boolean; data: PostData[] }>(
-      `/posts/getAllPost/${influencerId}/${skip}/${limit}`,
-      { method: "GET" }
-    );
-    return res.data ?? [];
-  } catch {
-    // Fallback to public endpoint
-    return getInfluencerPosts(influencerId, skip, limit);
-  }
 }
 
 /** Decode URL-encoded HTML content to plain text */
@@ -169,59 +125,10 @@ export function formatCount(num: number | undefined): string {
   return num.toString();
 }
 
-/** Fetch media URLs for a batch of posts (unauthenticated to get actual URLs).
- *  Returns a map of postId -> { mediaUrl, thumbnailUrl } */
-export async function fetchPageMediaUrls(
-  influencerId: string,
-  skip = 0,
-  limit = 50
-): Promise<Map<string, { mediaUrl: string; thumbnailUrl: string }>> {
-  const result = new Map<string, { mediaUrl: string; thumbnailUrl: string }>();
-  try {
-    const res = await apiFetch<{ status: boolean; data: PostData[] }>("/posts/getUserPost", {
-      method: "POST",
-      body: JSON.stringify({
-        isLogin: "false",
-        influencerId,
-        userId: ADMIN_USER_ID,
-        skip,
-        limit,
-        key: OFFICIAL_API.AUTH_KEY,
-      }),
-    });
-    for (const post of res.data ?? []) {
-      const mediaUrl = post.location || post.mediaUrl || "";
-      const thumbnailUrl = post.thumbnailLocation || post.thumbnailUrl || "";
-      if (mediaUrl || thumbnailUrl) {
-        result.set(post._id, { mediaUrl, thumbnailUrl });
-        // Update DB in background
-        supabase.from("posts").update({
-          media_url: mediaUrl,
-          thumbnail_url: thumbnailUrl,
-          location: post.location || "",
-        }).eq("official_id", post._id).then(() => {});
-      }
-    }
-  } catch {
-    // silently fail
-  }
-  return result;
-}
-
-/** Fetch media URL for a single post (convenience wrapper) */
-export async function fetchPostMediaUrl(
-  influencerId: string,
-  postOfficialId: string
-): Promise<{ mediaUrl: string; thumbnailUrl: string } | null> {
-  const map = await fetchPageMediaUrls(influencerId, 0, 50);
-  return map.get(postOfficialId) ?? null;
-}
-
 /** Save or update a creator in the local database */
 export async function saveCreatorToDB(data: InfluencerData): Promise<void> {
   try {
     const postCount = (data.postCount || 0) + (data.videoCount || 0) + (data.imageCount || 0);
-    
     await supabase.from("creators").upsert({
       official_id: data._id,
       username: data.username,
@@ -280,17 +187,13 @@ export async function bulkDiscoverCreators(usernames: string[]): Promise<Influen
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/discover-creators`,
       {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
+        headers: { "content-type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({ usernames }),
       }
     );
     if (!res.ok) return [];
     const data = await res.json();
     const found: InfluencerData[] = data.data ?? [];
-    // Save all to DB in parallel
     await Promise.allSettled(found.map(c => saveCreatorToDB(c)));
     return found;
   } catch {
