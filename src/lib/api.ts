@@ -172,9 +172,7 @@ export function formatCount(num: number | undefined): string {
 /** Save or update a creator in the local database */
 export async function saveCreatorToDB(data: InfluencerData): Promise<void> {
   try {
-    const postCount = data.postCount || 0;
-    // Skip creators with zero posts
-    if (postCount === 0) return;
+    const postCount = (data.postCount || 0) + (data.videoCount || 0) + (data.imageCount || 0);
     
     await supabase.from("creators").upsert({
       official_id: data._id,
