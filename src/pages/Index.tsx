@@ -55,7 +55,7 @@ function CreatorCard({
   onClick: () => void;
 }) {
   return (
-    <div className="relative">
+    <div className="relative group">
       <Link
         to={`/creator/${c.username}`}
         onClick={onClick}
