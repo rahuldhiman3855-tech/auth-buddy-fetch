@@ -99,14 +99,25 @@ export async function getPostStats(): Promise<{ total: number; videos: number; i
   const { count: videos } = await supabase.from("posts").select("*", { count: "exact", head: true }).eq("type", "Video");
   const { count: images } = await supabase.from("posts").select("*", { count: "exact", head: true }).eq("type", "Image");
   
-  // Get distinct creators
-  const { data: creatorsData } = await supabase.from("posts").select("creator_id");
-  const uniqueCreators = new Set(creatorsData?.map(r => r.creator_id) ?? []);
+  // Get distinct creators - paginate to avoid 1000-row cap
+  const allCreatorIds = new Set<string>();
+  let creatorOffset = 0;
+  const CHUNK = 1000;
+  while (true) {
+    const { data: chunk } = await supabase
+      .from("posts")
+      .select("creator_id")
+      .range(creatorOffset, creatorOffset + CHUNK - 1);
+    if (!chunk || chunk.length === 0) break;
+    chunk.forEach(r => allCreatorIds.add(r.creator_id));
+    if (chunk.length < CHUNK) break;
+    creatorOffset += CHUNK;
+  }
 
   return {
     total: total ?? 0,
     videos: videos ?? 0,
     images: images ?? 0,
-    creators: uniqueCreators.size,
+    creators: allCreatorIds.size,
   };
 }

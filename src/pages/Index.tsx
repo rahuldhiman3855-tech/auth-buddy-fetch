@@ -319,7 +319,7 @@ export default function Index() {
           <div className="ml-auto">
             <Button variant="outline" size="sm" disabled={syncing} onClick={handleSync}>
               {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              <span className="ml-1 hidden sm:inline">{syncing ? syncProgress : "Sync Posts"}</span>
+              <span className="ml-1 text-xs sm:text-sm">{syncing ? syncProgress : "Sync"}</span>
             </Button>
           </div>
         </div>
