@@ -123,7 +123,7 @@ function PostCard({ post, currencySymbol = "₹", onPlay }: { post: PostData; cu
 
 export default function CreatorProfile() {
   const { username } = useParams<{ username: string }>();
-
+  const [activePost, setActivePost] = useState<PostData | null>(null);
   const {
     data: influencer,
     isLoading: loadingInfluencer,
@@ -290,7 +290,7 @@ export default function CreatorProfile() {
                     {posts
                       .filter((p) => !p.isDeleted && !p.isHided)
                       .map((post) => (
-                        <PostCard key={post._id} post={post} />
+                        <PostCard key={post._id} post={post} onPlay={setActivePost} />
                       ))}
                   </div>
 
@@ -314,6 +314,50 @@ export default function CreatorProfile() {
               )}
             </section>
           </>
+        )}
+
+        {/* Video Player Modal */}
+        {activePost && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            onClick={() => setActivePost(null)}
+          >
+            <div
+              className="relative w-full max-w-4xl mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setActivePost(null)}
+                className="absolute -top-10 right-0 text-white hover:text-primary transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+              <div className="rounded-xl overflow-hidden bg-black">
+                {activePost.type === "Video" && (activePost.location || activePost.mediaUrl) ? (
+                  <video
+                    src={activePost.location || activePost.mediaUrl}
+                    controls
+                    autoPlay
+                    className="w-full max-h-[80vh]"
+                    poster={activePost.thumbnailLocation || activePost.thumbnailUrl}
+                  />
+                ) : (activePost.location || activePost.mediaUrl) ? (
+                  <img
+                    src={activePost.location || activePost.mediaUrl}
+                    alt={decodeContent(activePost.content)}
+                    className="w-full max-h-[80vh] object-contain"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center py-32 text-muted-foreground">
+                    <p>No media available</p>
+                  </div>
+                )}
+              </div>
+              <p className="mt-3 text-sm text-white/80 line-clamp-2">
+                {decodeContent(activePost.content)}
+              </p>
+            </div>
+          </div>
         )}
       </main>
     </div>
