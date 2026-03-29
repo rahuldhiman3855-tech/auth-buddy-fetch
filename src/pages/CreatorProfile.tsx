@@ -333,25 +333,35 @@ export default function CreatorProfile() {
                 <X className="h-6 w-6" />
               </button>
               <div className="rounded-xl overflow-hidden bg-black">
-                {activePost.type === "Video" && (activePost.location || activePost.mediaUrl) ? (
-                  <video
-                    src={activePost.location || activePost.mediaUrl}
-                    controls
-                    autoPlay
-                    className="w-full max-h-[80vh]"
-                    poster={activePost.thumbnailLocation || activePost.thumbnailUrl}
-                  />
-                ) : (activePost.location || activePost.mediaUrl) ? (
-                  <img
-                    src={activePost.location || activePost.mediaUrl}
-                    alt={decodeContent(activePost.content)}
-                    className="w-full max-h-[80vh] object-contain"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center py-32 text-muted-foreground">
-                    <p>No media available</p>
-                  </div>
-                )}
+                {(() => {
+                  const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
+                  const mediaUrl = activePost.location || activePost.mediaUrl || '';
+                  const proxiedUrl = `${proxyBase}?url=${encodeURIComponent(mediaUrl)}`;
+                  if (activePost.type === "Video" && mediaUrl) {
+                    return (
+                      <video
+                        src={proxiedUrl}
+                        controls
+                        autoPlay
+                        className="w-full max-h-[80vh]"
+                        poster={activePost.thumbnailLocation || activePost.thumbnailUrl}
+                      />
+                    );
+                  } else if (mediaUrl) {
+                    return (
+                      <img
+                        src={proxiedUrl}
+                        alt={decodeContent(activePost.content)}
+                        className="w-full max-h-[80vh] object-contain"
+                      />
+                    );
+                  }
+                  return (
+                    <div className="flex items-center justify-center py-32 text-muted-foreground">
+                      <p>No media available</p>
+                    </div>
+                  );
+                })()}
               </div>
               <p className="mt-3 text-sm text-white/80 line-clamp-2">
                 {decodeContent(activePost.content)}
