@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Navbar from "@/components/Navbar";
 import { Link } from "react-router-dom";
 import { getStoredCreators, discoverCreator, bulkDiscoverCreators, formatCount, type StoredCreator } from "@/lib/api";
-import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,8 @@ export default function Index() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState("");
   const { toast } = useToast();
 
   const loadCreators = useCallback(async (pageNum: number) => {
@@ -60,6 +62,42 @@ export default function Index() {
     }
   };
 
+  const handleBatchSync = async () => {
+    setSyncing(true);
+    setSyncProgress("Starting...");
+    const BATCH = 50;
+    let offset = 0;
+    let totalProcessed = 0;
+    let total = totalCount;
+
+    try {
+      while (offset < total) {
+        setSyncProgress(`Scanning ${offset + 1}–${Math.min(offset + BATCH, total)} of ${total}...`);
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/batch-sync-posts?offset=${offset}&limit=${BATCH}`,
+          {
+            headers: {
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              "content-type": "application/json",
+            },
+          }
+        );
+        if (!res.ok) throw new Error(`Sync failed: ${res.status}`);
+        const data = await res.json();
+        total = data.total || total;
+        totalProcessed += data.processed || 0;
+        offset += BATCH;
+      }
+      toast({ title: "Sync complete!", description: `Updated post counts for ${totalProcessed} creators.` });
+      loadCreators(page);
+    } catch (e: any) {
+      toast({ title: "Sync error", description: e.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+      setSyncProgress("");
+    }
+  };
+
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
@@ -98,9 +136,18 @@ export default function Index() {
               <span className="ml-1 hidden sm:inline">Add</span>
             </Button>
           </form>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={syncing}
+            onClick={handleBatchSync}
+          >
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            <span className="ml-1 hidden sm:inline">{syncing ? syncProgress : "Sync Posts"}</span>
+          </Button>
         </div>
 
-        {/* Creator Grid */}
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
