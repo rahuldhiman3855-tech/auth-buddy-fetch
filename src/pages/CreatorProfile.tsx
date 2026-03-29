@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
+import { useRef, useCallback, useEffect } from "react";
 import {
   getInfluencer,
   getInfluencerPosts,
