@@ -169,6 +169,41 @@ export function formatCount(num: number | undefined): string {
   return num.toString();
 }
 
+/** Fetch media URL for a single post on-demand (unauthenticated to get actual URLs) */
+export async function fetchPostMediaUrl(influencerId: string, postOfficialId: string): Promise<{ mediaUrl: string; thumbnailUrl: string } | null> {
+  try {
+    // Fetch a small batch from the creator and find the specific post
+    const res = await apiFetch<{ status: boolean; data: PostData[] }>("/posts/getUserPost", {
+      method: "POST",
+      body: JSON.stringify({
+        isLogin: "false",
+        influencerId,
+        userId: ADMIN_USER_ID,
+        skip: 0,
+        limit: 50,
+        key: OFFICIAL_API.AUTH_KEY,
+      }),
+    });
+    const post = (res.data ?? []).find(p => p._id === postOfficialId);
+    if (post) {
+      const mediaUrl = post.location || post.mediaUrl || "";
+      const thumbnailUrl = post.thumbnailLocation || post.thumbnailUrl || "";
+      // Update DB in background
+      if (mediaUrl || thumbnailUrl) {
+        supabase.from("posts").update({
+          media_url: mediaUrl,
+          thumbnail_url: thumbnailUrl,
+          location: post.location || "",
+        }).eq("official_id", postOfficialId).then(() => {});
+      }
+      return { mediaUrl, thumbnailUrl };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Save or update a creator in the local database */
 export async function saveCreatorToDB(data: InfluencerData): Promise<void> {
   try {
