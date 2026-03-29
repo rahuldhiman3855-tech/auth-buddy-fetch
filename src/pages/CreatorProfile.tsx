@@ -7,6 +7,7 @@ import {
   decodeContent,
   formatDuration,
   formatCount,
+  fetchPostMediaUrl,
   type PostData,
   type InfluencerData,
 } from "@/lib/api";
@@ -155,6 +156,8 @@ function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) =
 export default function CreatorProfile() {
   const { username } = useParams<{ username: string }>();
   const [activePost, setActivePost] = useState<PostData | null>(null);
+  const [activeMediaUrl, setActiveMediaUrl] = useState<string>("");
+  const [loadingMedia, setLoadingMedia] = useState(false);
 
   // Check if username is an ObjectID placeholder (hex string, 12 chars)
   const isObjectId = /^[a-f0-9]{12,24}$/.test(username || "");
@@ -366,7 +369,19 @@ export default function CreatorProfile() {
                     {posts
                       .filter((p) => !p.isDeleted && !p.isHided)
                       .map((post) => (
-                        <PostCard key={post._id} post={post} onPlay={setActivePost} />
+                        <PostCard key={post._id} post={post} onPlay={async (p) => {
+                          setActivePost(p);
+                          const media = p.location || p.mediaUrl;
+                          if (media) {
+                            setActiveMediaUrl(media);
+                            return;
+                          }
+                          setLoadingMedia(true);
+                          setActiveMediaUrl("");
+                          const result = await fetchPostMediaUrl(influencerId!, p._id);
+                          if (result?.mediaUrl) setActiveMediaUrl(result.mediaUrl);
+                          setLoadingMedia(false);
+                        }} />
                       ))}
                   </div>
 
@@ -396,47 +411,45 @@ export default function CreatorProfile() {
         {activePost && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            onClick={() => setActivePost(null)}
+            onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
           >
             <div
               className="relative w-full max-w-4xl mx-4"
               onClick={(e) => e.stopPropagation()}
             >
               <button
-                onClick={() => setActivePost(null)}
+                onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
                 className="absolute -top-10 right-0 text-white hover:text-primary transition-colors"
               >
                 <X className="h-6 w-6" />
               </button>
               <div className="rounded-xl overflow-hidden bg-black">
-                {(() => {
-                  const mediaUrl = activePost.location || activePost.mediaUrl || '';
-                  const proxiedUrl = proxyUrl(mediaUrl);
-                  if (activePost.type === "Video" && mediaUrl) {
-                    return (
-                      <video
-                        src={proxiedUrl}
-                        controls
-                        autoPlay
-                        className="w-full max-h-[80vh]"
-                        poster={proxyUrl(activePost.thumbnailLocation || activePost.thumbnailUrl)}
-                      />
-                    );
-                  } else if (mediaUrl) {
-                    return (
-                      <img
-                        src={proxiedUrl}
-                        alt={decodeContent(activePost.content)}
-                        className="w-full max-h-[80vh] object-contain"
-                      />
-                    );
-                  }
-                  return (
-                    <div className="flex items-center justify-center py-32 text-muted-foreground">
-                      <p>No media available</p>
-                    </div>
-                  );
-                })()}
+                {loadingMedia ? (
+                  <div className="flex flex-col items-center justify-center py-32 text-white gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm text-white/70">Loading media...</p>
+                  </div>
+                ) : activeMediaUrl ? (
+                  activePost.type === "Video" ? (
+                    <video
+                      src={proxyUrl(activeMediaUrl)}
+                      controls
+                      autoPlay
+                      className="w-full max-h-[80vh]"
+                      poster={proxyUrl(activePost.thumbnailLocation || activePost.thumbnailUrl)}
+                    />
+                  ) : (
+                    <img
+                      src={proxyUrl(activeMediaUrl)}
+                      alt={decodeContent(activePost.content)}
+                      className="w-full max-h-[80vh] object-contain"
+                    />
+                  )
+                ) : (
+                  <div className="flex items-center justify-center py-32 text-muted-foreground">
+                    <p>No media available</p>
+                  </div>
+                )}
               </div>
               <p className="mt-3 text-sm text-white/80 line-clamp-2">
                 {decodeContent(activePost.content)}

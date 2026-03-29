@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import SyncProgressPanel from "@/components/SyncProgressPanel";
 import { Link, useSearchParams } from "react-router-dom";
-import { formatCount, formatDuration, decodeContent } from "@/lib/api";
+import { formatCount, formatDuration, decodeContent, fetchPostMediaUrl } from "@/lib/api";
 import { getStoredPosts, getPostStats, type StoredPost } from "@/lib/postsApi";
 import {
   Search, Video, Image, Loader2, ChevronLeft, ChevronRight, RefreshCw,
@@ -164,6 +164,8 @@ export default function Index() {
 
   const [stats, setStats] = useState({ total: 0, videos: 0, images: 0, creators: 0 });
   const [activePost, setActivePost] = useState<StoredPost | null>(null);
+  const [activeMediaUrl, setActiveMediaUrl] = useState<string>("");
+  const [loadingMedia, setLoadingMedia] = useState(false);
   const { toast } = useToast();
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
 
@@ -275,6 +277,23 @@ export default function Index() {
       setSyncing(false);
       setSyncProgress("");
     }
+  };
+
+  const handlePlayPost = async (post: StoredPost) => {
+    setActivePost(post);
+    const existingMedia = post.media_url || post.location;
+    if (existingMedia) {
+      setActiveMediaUrl(existingMedia);
+      return;
+    }
+    // Fetch on-demand
+    setLoadingMedia(true);
+    setActiveMediaUrl("");
+    const result = await fetchPostMediaUrl(post.creator_id, post.official_id);
+    if (result?.mediaUrl) {
+      setActiveMediaUrl(result.mediaUrl);
+    }
+    setLoadingMedia(false);
   };
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
@@ -423,7 +442,7 @@ export default function Index() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {posts.map((post) => (
-              <FeedPostCard key={post.id} post={post} onPlay={setActivePost} />
+              <FeedPostCard key={post.id} post={post} onPlay={handlePlayPost} />
             ))}
           </div>
         )}
@@ -448,44 +467,42 @@ export default function Index() {
       {activePost && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-          onClick={() => setActivePost(null)}
+          onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
         >
           <div className="relative w-full max-w-4xl mx-4" onClick={(e) => e.stopPropagation()}>
             <button
-              onClick={() => setActivePost(null)}
+              onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
               className="absolute -top-10 right-0 text-white hover:text-primary transition-colors"
             >
               <X className="h-6 w-6" />
             </button>
             <div className="rounded-xl overflow-hidden bg-black">
-              {(() => {
-                const mediaUrl = activePost.location || activePost.media_url || '';
-                const proxiedUrl = proxyUrl(mediaUrl);
-                if (activePost.type === "Video" && mediaUrl) {
-                  return (
-                    <video
-                      src={proxiedUrl}
-                      controls
-                      autoPlay
-                      className="w-full max-h-[80vh]"
-                      poster={proxyUrl(activePost.thumbnail_url)}
-                    />
-                  );
-                } else if (mediaUrl) {
-                  return (
-                    <img
-                      src={proxiedUrl}
-                      alt={activePost.content || ""}
-                      className="w-full max-h-[80vh] object-contain"
-                    />
-                  );
-                }
-                return (
-                  <div className="flex items-center justify-center py-32 text-muted-foreground">
-                    <p>No media available</p>
-                  </div>
-                );
-              })()}
+              {loadingMedia ? (
+                <div className="flex flex-col items-center justify-center py-32 text-white gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-white/70">Loading media...</p>
+                </div>
+              ) : activeMediaUrl ? (
+                activePost.type === "Video" ? (
+                  <video
+                    src={proxyUrl(activeMediaUrl)}
+                    controls
+                    autoPlay
+                    className="w-full max-h-[80vh]"
+                    poster={proxyUrl(activePost.thumbnail_url)}
+                  />
+                ) : (
+                  <img
+                    src={proxyUrl(activeMediaUrl)}
+                    alt={activePost.content || ""}
+                    className="w-full max-h-[80vh] object-contain"
+                  />
+                )
+              ) : (
+                <div className="flex items-center justify-center py-32 text-muted-foreground">
+                  <p>No media available</p>
+                </div>
+              )}
             </div>
             <div className="mt-3 flex items-center gap-3">
               {activePost.creator_profile_pic && (
@@ -496,7 +513,7 @@ export default function Index() {
                 <Link
                   to={`/creator/${activePost.creator_username || activePost.creator_id}`}
                   className="text-xs text-primary hover:underline"
-                  onClick={() => setActivePost(null)}
+                  onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
                 >
                   {activePost.creator_name || activePost.creator_username}
                 </Link>
