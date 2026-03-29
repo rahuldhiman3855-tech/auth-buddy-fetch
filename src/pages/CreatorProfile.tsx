@@ -3,7 +3,7 @@ import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { useRef, useEffect, useState } from "react";
 import {
   getInfluencer,
-  getInfluencerPosts,
+  getAllPosts,
   decodeContent,
   formatDuration,
   formatCount,
