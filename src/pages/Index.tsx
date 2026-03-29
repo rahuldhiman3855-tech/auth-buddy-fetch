@@ -136,7 +136,16 @@ export default function Index() {
               <span className="ml-1 hidden sm:inline">Add</span>
             </Button>
           </form>
-        </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={syncing}
+            onClick={handleBatchSync}
+          >
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            <span className="ml-1 hidden sm:inline">{syncing ? syncProgress : "Sync Posts"}</span>
+          </Button>
 
         {/* Creator Grid */}
         {loading ? (
