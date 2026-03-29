@@ -131,7 +131,7 @@ function CreatorCard({
         className={`absolute top-2 right-2 z-20 flex h-7 w-7 items-center justify-center rounded-full transition-all ${
           isPinned
             ? "bg-accent text-accent-foreground shadow-md hover:bg-destructive hover:text-destructive-foreground"
-            : "bg-black/50 text-white opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-accent-foreground"
+            : "bg-black/50 text-white sm:opacity-0 sm:group-hover:opacity-100 hover:bg-accent hover:text-accent-foreground"
         }`}
         title={isPinned ? "Unpin creator" : "Pin creator"}
       >
