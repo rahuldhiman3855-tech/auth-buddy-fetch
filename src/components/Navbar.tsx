@@ -22,6 +22,7 @@ export default function Navbar() {
         <Link to="/" className="flex items-center gap-1">
           <span className="text-2xl font-black italic text-primary">O</span>
           <span className="text-lg font-bold tracking-tight text-foreground">fficial.me</span>
+          <span className="ml-2 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Admin</span>
         </Link>
 
         <Link
