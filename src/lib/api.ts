@@ -223,8 +223,44 @@ export async function getStoredCreators(
   return { data: (data as StoredCreator[]) ?? [], count: count ?? 0 };
 }
 
+/** Bulk discover creators via edge function */
+export async function bulkDiscoverCreators(usernames: string[]): Promise<InfluencerData[]> {
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/discover-creators`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ usernames }),
+      }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const found: InfluencerData[] = data.data ?? [];
+    // Save all to DB in parallel
+    await Promise.allSettled(found.map(c => saveCreatorToDB(c)));
+    return found;
+  } catch {
+    return [];
+  }
+}
+
 /** Search and discover a creator, saving to DB */
 export async function discoverCreator(username: string): Promise<InfluencerData | null> {
+  try {
+    const data = await getInfluencer(username);
+    if (data?._id) {
+      await saveCreatorToDB(data);
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
   try {
     const data = await getInfluencer(username);
     if (data?._id) {
