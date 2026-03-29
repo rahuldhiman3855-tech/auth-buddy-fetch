@@ -131,14 +131,43 @@ export default function CreatorProfile() {
     enabled: !!username,
   });
 
+  const PAGE_SIZE = 20;
+
   const {
-    data: posts,
+    data: postsData,
     isLoading: loadingPosts,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["posts", influencer?._id],
-    queryFn: () => getInfluencerPosts(influencer!._id),
+    queryFn: ({ pageParam = 0 }) => getInfluencerPosts(influencer!._id, pageParam, PAGE_SIZE),
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.length < PAGE_SIZE) return undefined;
+      return allPages.reduce((sum, page) => sum + page.length, 0);
+    },
+    initialPageParam: 0,
     enabled: !!influencer?._id,
   });
+
+  const posts = postsData?.pages.flat() ?? [];
+
+  // Intersection observer for infinite scroll
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const profileImage = influencer?.userProfileImage || influencer?.profilePic || "";
   const bio = influencer?.userBio || influencer?.bio || "";
