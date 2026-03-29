@@ -3,27 +3,17 @@ import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { useRef, useEffect, useState } from "react";
 import {
   getInfluencer,
-  getAllPosts,
+  getInfluencerPosts,
   decodeContent,
   formatDuration,
   formatCount,
-  fetchPageMediaUrls,
   type PostData,
   type InfluencerData,
 } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import {
-  BadgeCheck,
-  ArrowLeft,
-  Play,
-  Eye,
-  Heart,
-  Loader2,
-  Clock,
-  X,
-  Download,
-  HardDrive,
+  BadgeCheck, ArrowLeft, Play, Eye, Heart, Loader2, Clock, X, Download, HardDrive,
 } from "lucide-react";
 
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
@@ -35,24 +25,31 @@ function proxyUrl(url?: string): string {
 function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) => void }) {
   const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
   const title = decodeContent(post.content) || "Untitled";
-  const isPrivate = post.category === "private";
   const duration = formatDuration(post.duration);
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } }, { rootMargin: "200px" });
+    obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
 
   return (
     <div
+      ref={ref}
       onClick={() => onPlay(post)}
       className="group relative flex flex-col overflow-hidden rounded-xl bg-card border border-border shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-muted">
-        {thumb ? (
+        {visible && thumb ? (
           <img
             src={thumb}
             alt={title}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
@@ -60,39 +57,25 @@ function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) =
           </div>
         )}
 
-        {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-        {/* Play button on hover */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/90 shadow-lg">
             <Play className="h-6 w-6 text-primary-foreground ml-0.5" fill="currentColor" />
           </div>
         </div>
 
-        {/* Duration */}
         {duration && (
           <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/70 px-2 py-0.5 text-xs font-medium text-white">
-            <Clock className="h-3 w-3" />
-            {duration}
+            <Clock className="h-3 w-3" />{duration}
           </span>
         )}
 
-        {/* Download button */}
         {(post.location || post.mediaUrl) && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
-              const mediaUrl = post.location || post.mediaUrl || '';
-              const proxiedUrl = `${proxyBase}?url=${encodeURIComponent(mediaUrl)}`;
-              const a = document.createElement('a');
-              a.href = proxiedUrl;
-              a.download = `${decodeContent(post.content) || post._id}.${post.type === 'Video' ? 'mp4' : 'jpg'}`;
-              a.target = '_blank';
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
+              window.open(proxyUrl(post.location || post.mediaUrl || ""), "_blank");
             }}
             className="absolute top-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white hover:bg-primary transition-colors opacity-0 group-hover:opacity-100"
             title="Download"
@@ -101,7 +84,6 @@ function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) =
           </button>
         )}
 
-        {/* Type & Quality badges */}
         <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
           {post.type && (
             <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
@@ -114,38 +96,20 @@ function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) =
               {post.fileSizeInMB >= 1 ? `${post.fileSizeInMB.toFixed(1)} MB` : `${(post.fileSizeInMB * 1024).toFixed(0)} KB`}
             </span>
           )}
-          {post.fileSizeInMB && post.fileSizeInMB > 50 && (
-            <span className="rounded-md bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-white">
-              HD
-            </span>
-          )}
         </div>
       </div>
 
       <div className="flex flex-col gap-1.5 p-3">
-        <h3 className="text-sm font-semibold text-card-foreground line-clamp-2 leading-tight">
-          {title}
-        </h3>
+        <h3 className="text-sm font-semibold text-card-foreground line-clamp-2 leading-tight">{title}</h3>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           {post.viewCount !== undefined && post.viewCount > 0 && (
-            <span className="flex items-center gap-1">
-              <Eye className="h-3.5 w-3.5" />
-              {formatCount(post.viewCount)}
-            </span>
+            <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{formatCount(post.viewCount)}</span>
           )}
           {post.likes && post.likes.length > 0 && (
-            <span className="flex items-center gap-1">
-              <Heart className="h-3.5 w-3.5" />
-              {formatCount(post.likes.length)}
-            </span>
+            <span className="flex items-center gap-1"><Heart className="h-3.5 w-3.5" />{formatCount(post.likes.length)}</span>
           )}
           {post.date && (
-            <span>
-              {new Date(post.date).toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "short",
-              })}
-            </span>
+            <span>{new Date(post.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
           )}
         </div>
       </div>
@@ -156,60 +120,34 @@ function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) =
 export default function CreatorProfile() {
   const { username } = useParams<{ username: string }>();
   const [activePost, setActivePost] = useState<PostData | null>(null);
-  const [activeMediaUrl, setActiveMediaUrl] = useState<string>("");
-  const [loadingMedia, setLoadingMedia] = useState(false);
-  const [mediaCache, setMediaCache] = useState<Map<string, { mediaUrl: string; thumbnailUrl: string }>>(new Map());
+  const [activeMediaUrl, setActiveMediaUrl] = useState("");
 
-  // Check if username is an ObjectID placeholder (hex string, 12 chars)
   const isObjectId = /^[a-f0-9]{12,24}$/.test(username || "");
 
-  // For ObjectID usernames, load from DB (check both username and official_id)
   const { data: dbCreator } = useQuery({
     queryKey: ["db-creator", username],
     queryFn: async () => {
-      // Try by username first
-      const { data: byUsername } = await supabase
-        .from("creators")
-        .select("*")
-        .eq("username", username!)
-        .single();
+      const { data: byUsername } = await supabase.from("creators").select("*").eq("username", username!).single();
       if (byUsername) return byUsername;
-      // Fallback: try by official_id
-      const { data: byOfficialId } = await supabase
-        .from("creators")
-        .select("*")
-        .eq("official_id", username!)
-        .single();
-      return byOfficialId;
+      const { data: byId } = await supabase.from("creators").select("*").eq("official_id", username!).single();
+      return byId;
     },
     enabled: !!username && isObjectId,
   });
 
-  // For real usernames, load from API
-  const {
-    data: apiInfluencer,
-    isLoading: loadingInfluencer,
-    error: influencerError,
-  } = useQuery({
+  const { data: apiInfluencer, isLoading: loadingInfluencer, error: influencerError } = useQuery({
     queryKey: ["influencer", username],
     queryFn: () => getInfluencer(username!),
     enabled: !!username && !isObjectId,
   });
 
-  // Build a unified influencer object
   const influencer: Partial<InfluencerData> | undefined = isObjectId && dbCreator
     ? {
-        _id: dbCreator.official_id,
-        username: dbCreator.username,
-        name: dbCreator.name,
-        userProfileImage: dbCreator.profile_pic,
-        coverPic: dbCreator.cover_pic,
-        userBio: dbCreator.bio,
-        category: dbCreator.category,
-        followerCount: dbCreator.follower_count,
-        videoCount: dbCreator.video_count,
-        postCount: dbCreator.post_count,
-        isVerified: dbCreator.is_verified,
+        _id: dbCreator.official_id, username: dbCreator.username, name: dbCreator.name,
+        userProfileImage: dbCreator.profile_pic, coverPic: dbCreator.cover_pic,
+        userBio: dbCreator.bio, category: dbCreator.category,
+        followerCount: dbCreator.follower_count, videoCount: dbCreator.video_count,
+        postCount: dbCreator.post_count, isVerified: dbCreator.is_verified,
       }
     : apiInfluencer;
 
@@ -217,15 +155,9 @@ export default function CreatorProfile() {
 
   const PAGE_SIZE = 10;
 
-  const {
-    data: postsData,
-    isLoading: loadingPosts,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
+  const { data: postsData, isLoading: loadingPosts, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["posts", influencerId],
-    queryFn: ({ pageParam = 0 }) => getAllPosts(influencerId!, pageParam, PAGE_SIZE),
+    queryFn: ({ pageParam = 0 }) => getInfluencerPosts(influencerId!, pageParam, PAGE_SIZE),
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < PAGE_SIZE) return undefined;
       return allPages.reduce((sum, page) => sum + page.length, 0);
@@ -236,54 +168,42 @@ export default function CreatorProfile() {
 
   const posts = postsData?.pages.flat() ?? [];
 
-  // Batch-fetch media URLs for all loaded posts that are missing media
+  // Cache posts to DB in background
   useEffect(() => {
-    if (!influencerId || posts.length === 0) return;
-    const missing = posts.filter(p => !p.location && !p.mediaUrl && !mediaCache.has(p._id));
-    if (missing.length === 0) return;
-    
-    fetchPageMediaUrls(influencerId, 0, 50).then(map => {
-      if (map.size > 0) {
-        setMediaCache(prev => {
-          const next = new Map(prev);
-          map.forEach((v, k) => next.set(k, v));
-          return next;
-        });
-      }
-    });
-  }, [influencerId, posts.length]);
-
-  // Update creator post count in DB when posts are loaded
-  useEffect(() => {
-    if (influencerId && posts.length > 0) {
-      const validPosts = posts.filter(p => !p.isDeleted && !p.isHided);
-      supabase
-        .from("creators")
-        .update({
-          post_count: validPosts.length,
-          video_count: validPosts.filter(p => p.type === "Video").length,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("official_id", influencerId)
-        .then(() => {});
+    if (!influencerId || !influencer || posts.length === 0) return;
+    const rows = posts.filter(p => !p.isDeleted && !p.isHided).map(p => ({
+      official_id: p._id,
+      creator_id: influencerId,
+      creator_username: influencer.username || null,
+      creator_name: influencer.name || null,
+      creator_profile_pic: influencer.userProfileImage || influencer.profilePic || null,
+      content: decodeContent(p.content),
+      category: p.category || null,
+      type: p.type || null,
+      price: p.price ?? 0,
+      duration: p.duration ?? 0,
+      file_size_mb: p.fileSizeInMB ?? 0,
+      thumbnail_url: p.thumbnailLocation || p.thumbnailUrl || null,
+      media_url: p.mediaUrl || null,
+      location: p.location || null,
+      post_date: p.date || p.created_at || null,
+      view_count: p.viewCount ?? 0,
+      like_count: p.likeCount ?? (p.likes?.length ?? 0),
+      is_premium: p.isPremium ?? false,
+    }));
+    if (rows.length > 0) {
+      supabase.from("posts").upsert(rows, { onConflict: "official_id" }).then(() => {});
     }
-  }, [influencerId, posts.length]);
+  }, [posts.length, influencerId]);
 
-  // Intersection observer for infinite scroll
   const loadMoreRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!loadMoreRef.current || !hasNextPage) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage();
+    }, { threshold: 0.1 });
+    obs.observe(loadMoreRef.current);
+    return () => obs.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const profileImage = proxyUrl(influencer?.userProfileImage || influencer?.profilePic);
@@ -294,43 +214,30 @@ export default function CreatorProfile() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="mx-auto max-w-7xl px-4 py-6">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
-        >
+        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back
         </Link>
 
         {loadingInfluencer && (
-          <div className="flex items-center justify-center py-32">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
+          <div className="flex items-center justify-center py-32"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
         )}
 
         {influencerError && (
           <div className="flex flex-col items-center justify-center py-32">
             <p className="text-5xl mb-4">😕</p>
             <p className="text-muted-foreground">Could not load creator profile</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {(influencerError as Error).message}
-            </p>
           </div>
         )}
 
         {influencer && (
           <>
-            {/* Profile header */}
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-accent/10 to-muted">
               <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
               <div className="relative px-6 pb-6 pt-16 md:px-10 md:pt-24">
                 <div className="flex flex-col md:flex-row md:items-end gap-5">
                   <div className="h-24 w-24 md:h-32 md:w-32 rounded-full p-1 bg-gradient-to-br from-primary to-accent shadow-xl">
                     {profileImage ? (
-                      <img
-                        src={profileImage}
-                        alt={influencer.name}
-                        className="h-full w-full rounded-full object-cover border-4 border-card"
-                      />
+                      <img src={profileImage} alt={influencer.name} className="h-full w-full rounded-full object-cover border-4 border-card" />
                     ) : (
                       <div className="h-full w-full rounded-full bg-muted border-4 border-card flex items-center justify-center text-3xl font-bold text-primary">
                         {influencer.name?.[0]?.toUpperCase() || "?"}
@@ -339,91 +246,48 @@ export default function CreatorProfile() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h1 className="text-2xl font-black text-foreground md:text-3xl">
-                        {influencer.name}
-                      </h1>
-                      {influencer.isVerifiedEmail && (
-                        <BadgeCheck className="h-6 w-6 text-primary" />
-                      )}
+                      <h1 className="text-2xl font-black text-foreground md:text-3xl">{influencer.name}</h1>
+                      {influencer.isVerifiedEmail && <BadgeCheck className="h-6 w-6 text-primary" />}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">@{influencer.username}</p>
-                    {bio && (
-                      <p className="mt-2 text-sm text-foreground/80 max-w-lg">{bio}</p>
-                    )}
+                    {bio && <p className="mt-2 text-sm text-foreground/80 max-w-lg">{bio}</p>}
                     <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>
-                        <span className="font-bold text-foreground">{totalPosts}</span> videos
-                      </span>
+                      <span><span className="font-bold text-foreground">{totalPosts}</span> videos</span>
                       {influencer.imageCount ? (
-                        <>
-                          <span>•</span>
-                          <span>
-                            <span className="font-bold text-foreground">{influencer.imageCount}</span> images
-                          </span>
-                        </>
+                        <><span>•</span><span><span className="font-bold text-foreground">{influencer.imageCount}</span> images</span></>
                       ) : null}
                     </div>
-
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Posts */}
             <section className="mt-8">
-              <h2 className="text-lg font-bold text-foreground mb-4">
-                📺 Videos & Posts ({posts.length})
-              </h2>
+              <h2 className="text-lg font-bold text-foreground mb-4">📺 Videos & Posts ({posts.length})</h2>
 
               {loadingPosts && (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
+                <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
               )}
 
               {posts.length > 0 ? (
                 <>
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                    {posts
-                      .filter((p) => !p.isDeleted && !p.isHided)
-                      .map((post) => (
-                        <PostCard key={post._id} post={post} onPlay={async (p) => {
-                          setActivePost(p);
-                          // Check direct post data first, then cache
-                          const media = p.location || p.mediaUrl || mediaCache.get(p._id)?.mediaUrl;
-                          if (media) {
-                            setActiveMediaUrl(media);
-                            return;
-                          }
-                          // Fallback: fetch individually
-                          setLoadingMedia(true);
-                          setActiveMediaUrl("");
-                          const map = await fetchPageMediaUrls(influencerId!, 0, 50);
-                          const found = map.get(p._id);
-                          if (found?.mediaUrl) {
-                            setActiveMediaUrl(found.mediaUrl);
-                            setMediaCache(prev => { const n = new Map(prev); n.set(p._id, found); return n; });
-                          }
-                          setLoadingMedia(false);
-                        }} />
-                      ))}
+                    {posts.filter(p => !p.isDeleted && !p.isHided).map(post => (
+                      <PostCard key={post._id} post={post} onPlay={(p) => {
+                        setActivePost(p);
+                        setActiveMediaUrl(p.location || p.mediaUrl || "");
+                      }} />
+                    ))}
                   </div>
-
-                  {/* Infinite scroll trigger */}
                   <div ref={loadMoreRef} className="flex items-center justify-center py-8">
-                    {isFetchingNextPage && (
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    )}
-                    {!hasNextPage && posts.length > PAGE_SIZE && (
-                      <p className="text-xs text-muted-foreground">No more posts</p>
-                    )}
+                    {isFetchingNextPage && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                    {!hasNextPage && posts.length > PAGE_SIZE && <p className="text-xs text-muted-foreground">No more posts</p>}
                   </div>
                 </>
               ) : (
                 !loadingPosts && (
                   <div className="flex flex-col items-center py-16 text-muted-foreground">
-                    <p className="text-4xl mb-3">🎬</p>
-                    <p className="text-sm">No posts yet</p>
+                    <p className="text-4xl mb-3">🎬</p><p className="text-sm">No posts yet</p>
                   </div>
                 )
               )}
@@ -431,53 +295,24 @@ export default function CreatorProfile() {
           </>
         )}
 
-        {/* Video Player Modal */}
         {activePost && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
-          >
-            <div
-              className="relative w-full max-w-4xl mx-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
-                className="absolute -top-10 right-0 text-white hover:text-primary transition-colors"
-              >
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}>
+            <div className="relative w-full max-w-4xl mx-4" onClick={(e) => e.stopPropagation()}>
+              <button onClick={() => { setActivePost(null); setActiveMediaUrl(""); }} className="absolute -top-10 right-0 text-white hover:text-primary transition-colors">
                 <X className="h-6 w-6" />
               </button>
               <div className="rounded-xl overflow-hidden bg-black">
-                {loadingMedia ? (
-                  <div className="flex flex-col items-center justify-center py-32 text-white gap-3">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="text-sm text-white/70">Loading media...</p>
-                  </div>
-                ) : activeMediaUrl ? (
+                {activeMediaUrl ? (
                   activePost.type === "Video" ? (
-                    <video
-                      src={proxyUrl(activeMediaUrl)}
-                      controls
-                      autoPlay
-                      className="w-full max-h-[80vh]"
-                      poster={proxyUrl(activePost.thumbnailLocation || activePost.thumbnailUrl)}
-                    />
+                    <video src={proxyUrl(activeMediaUrl)} controls autoPlay className="w-full max-h-[80vh]" poster={activePost.thumbnailLocation || activePost.thumbnailUrl || ""} />
                   ) : (
-                    <img
-                      src={proxyUrl(activeMediaUrl)}
-                      alt={decodeContent(activePost.content)}
-                      className="w-full max-h-[80vh] object-contain"
-                    />
+                    <img src={proxyUrl(activeMediaUrl)} alt={decodeContent(activePost.content)} className="w-full max-h-[80vh] object-contain" />
                   )
                 ) : (
-                  <div className="flex items-center justify-center py-32 text-muted-foreground">
-                    <p>No media available</p>
-                  </div>
+                  <div className="flex items-center justify-center py-32 text-muted-foreground"><p>No media available</p></div>
                 )}
               </div>
-              <p className="mt-3 text-sm text-white/80 line-clamp-2">
-                {decodeContent(activePost.content)}
-              </p>
+              <p className="mt-3 text-sm text-white/80 line-clamp-2">{decodeContent(activePost.content)}</p>
             </div>
           </div>
         )}
