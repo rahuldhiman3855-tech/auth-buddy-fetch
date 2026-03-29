@@ -24,9 +24,12 @@ function markCreatorVisited(username: string) {
 
 
 export default function Index() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialPage = parseInt(searchParams.get("page") || "0", 10);
   const [creators, setCreators] = useState<StoredCreator[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(initialPage);
+  const [visitedSet, setVisitedSet] = useState<Set<string>>(getVisitedCreators);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
