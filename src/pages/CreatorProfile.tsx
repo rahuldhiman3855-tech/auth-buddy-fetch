@@ -3,7 +3,7 @@ import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { useRef, useEffect, useState } from "react";
 import {
   getInfluencer,
-  getInfluencerPosts,
+  getAllPosts,
   decodeContent,
   formatDuration,
   formatCount,
@@ -207,7 +207,7 @@ export default function CreatorProfile() {
     isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: ["posts", influencerId],
-    queryFn: ({ pageParam = 0 }) => getInfluencerPosts(influencerId!, pageParam, PAGE_SIZE),
+    queryFn: ({ pageParam = 0 }) => getAllPosts(influencerId!, pageParam, PAGE_SIZE),
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < PAGE_SIZE) return undefined;
       return allPages.reduce((sum, page) => sum + page.length, 0);
