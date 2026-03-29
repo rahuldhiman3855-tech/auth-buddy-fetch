@@ -326,6 +326,9 @@ export default function Index() {
           </div>
         </div>
 
+        {/* Live sync progress */}
+        <SyncProgressPanel isVisible={syncing} />
+
         {/* Search + Filters */}
         <div className="flex flex-col gap-3">
           <div className="relative">
