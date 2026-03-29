@@ -51,12 +51,18 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    loadCreators(0);
-  }, [loadCreators]);
+    loadCreators(initialPage);
+  }, [loadCreators, initialPage]);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
+    setSearchParams({ page: String(newPage) });
     loadCreators(newPage);
+  };
+
+  const handleCreatorClick = (username: string) => {
+    markCreatorVisited(username);
+    setVisitedSet(new Set(getVisitedCreators()));
   };
 
   const handleDiscover = async () => {
