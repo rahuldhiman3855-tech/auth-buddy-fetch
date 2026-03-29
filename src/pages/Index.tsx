@@ -147,13 +147,15 @@ export default function Index() {
                   )}
 
                   <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Eye className="h-3 w-3" />
-                      {formatCount(c.follower_count)}
-                    </span>
+                    {(c.follower_count || 0) > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Eye className="h-3 w-3" />
+                        {formatCount(c.follower_count)}
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
                       <Video className="h-3 w-3" />
-                      {formatCount(c.video_count)}
+                      {formatCount(c.post_count || c.video_count || 0)} posts
                     </span>
                     {c.category && (
                       <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-primary text-[10px] font-medium">
