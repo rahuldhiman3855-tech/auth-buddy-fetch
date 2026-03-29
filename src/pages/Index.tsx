@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "@/components/Navbar";
+import SyncProgressPanel from "@/components/SyncProgressPanel";
 import { Link, useSearchParams } from "react-router-dom";
 import { formatCount, formatDuration, decodeContent } from "@/lib/api";
 import { getStoredPosts, getPostStats, type StoredPost } from "@/lib/postsApi";
@@ -244,6 +245,7 @@ export default function Index() {
   const handleSync = async () => {
     setSyncing(true);
     setSyncProgress("Starting sync...");
+    const runId = crypto.randomUUID();
     let offset = 0;
     const BATCH = 20;
     let totalProcessed = 0;
@@ -253,7 +255,7 @@ export default function Index() {
       while (offset < totalCreators) {
         setSyncProgress(`Syncing creators ${offset + 1}–${Math.min(offset + BATCH, totalCreators)}...`);
         const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-all-posts?offset=${offset}&limit=${BATCH}`,
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-all-posts?offset=${offset}&limit=${BATCH}&run_id=${runId}`,
           { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, "content-type": "application/json" } }
         );
         if (!res.ok) throw new Error(`Sync failed: ${res.status}`);
@@ -323,6 +325,9 @@ export default function Index() {
             </Button>
           </div>
         </div>
+
+        {/* Live sync progress */}
+        <SyncProgressPanel isVisible={syncing} />
 
         {/* Search + Filters */}
         <div className="flex flex-col gap-3">
