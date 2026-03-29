@@ -164,7 +164,8 @@ export default function Index() {
 
   const [stats, setStats] = useState({ total: 0, videos: 0, images: 0, creators: 0 });
   const [activePost, setActivePost] = useState<StoredPost | null>(null);
-  const { toast } = useToast();
+  const [activeMediaUrl, setActiveMediaUrl] = useState<string>("");
+  const [loadingMedia, setLoadingMedia] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   const loadPosts = useCallback(async (pageNum: number) => {
