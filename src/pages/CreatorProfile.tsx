@@ -33,7 +33,7 @@ function proxyUrl(url?: string): string {
 }
 
 function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) => void }) {
-  const thumb = proxyUrl(post.thumbnailLocation || post.thumbnailUrl);
+  const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
   const title = decodeContent(post.content) || "Untitled";
   const isPrivate = post.category === "private";
   const duration = formatDuration(post.duration);

@@ -22,7 +22,7 @@ function proxyUrl(url?: string | null): string {
 }
 
 function FeedPostCard({ post, onPlay }: { post: StoredPost; onPlay: (p: StoredPost) => void }) {
-  const thumb = proxyUrl(post.thumbnail_url);
+  const thumb = post.thumbnail_url || "";
   const title = post.content || "Untitled";
   const duration = post.duration ? formatDuration(post.duration) : "";
 
