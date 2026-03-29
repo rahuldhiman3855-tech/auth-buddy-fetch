@@ -369,7 +369,19 @@ export default function CreatorProfile() {
                     {posts
                       .filter((p) => !p.isDeleted && !p.isHided)
                       .map((post) => (
-                        <PostCard key={post._id} post={post} onPlay={setActivePost} />
+                        <PostCard key={post._id} post={post} onPlay={async (p) => {
+                          setActivePost(p);
+                          const media = p.location || p.mediaUrl;
+                          if (media) {
+                            setActiveMediaUrl(media);
+                            return;
+                          }
+                          setLoadingMedia(true);
+                          setActiveMediaUrl("");
+                          const result = await fetchPostMediaUrl(influencerId!, p._id);
+                          if (result?.mediaUrl) setActiveMediaUrl(result.mediaUrl);
+                          setLoadingMedia(false);
+                        }} />
                       ))}
                   </div>
 
