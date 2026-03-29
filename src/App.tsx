@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index";
 import VideoPlayer from "./pages/VideoPlayer";
 import CreatorProfile from "./pages/CreatorProfile";
+import SearchPage from "./pages/SearchPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -18,6 +19,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/video/:id" element={<VideoPlayer />} />
           <Route path="/creator/:username" element={<CreatorProfile />} />
           <Route path="*" element={<NotFound />} />
