@@ -218,6 +218,22 @@ export default function CreatorProfile() {
 
   const posts = postsData?.pages.flat() ?? [];
 
+  // Update creator post count in DB when posts are loaded
+  useEffect(() => {
+    if (influencerId && posts.length > 0) {
+      const validPosts = posts.filter(p => !p.isDeleted && !p.isHided);
+      supabase
+        .from("creators")
+        .update({
+          post_count: validPosts.length,
+          video_count: validPosts.filter(p => p.type === "Video").length,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("official_id", influencerId)
+        .then(() => {});
+    }
+  }, [influencerId, posts.length]);
+
   // Intersection observer for infinite scroll
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
