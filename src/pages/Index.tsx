@@ -146,8 +146,8 @@ export default function Index() {
             {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             <span className="ml-1 hidden sm:inline">{syncing ? syncProgress : "Sync Posts"}</span>
           </Button>
+        </div>
 
-        {/* Creator Grid */}
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
