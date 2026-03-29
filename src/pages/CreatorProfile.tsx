@@ -141,15 +141,53 @@ function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) =
 export default function CreatorProfile() {
   const { username } = useParams<{ username: string }>();
   const [activePost, setActivePost] = useState<PostData | null>(null);
+
+  // Check if username is an ObjectID placeholder (hex string, 12 chars)
+  const isObjectId = /^[a-f0-9]{12,24}$/.test(username || "");
+
+  // For ObjectID usernames, load from DB
+  const { data: dbCreator } = useQuery({
+    queryKey: ["db-creator", username],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("creators")
+        .select("*")
+        .eq("username", username!)
+        .single();
+      return data;
+    },
+    enabled: !!username && isObjectId,
+  });
+
+  // For real usernames, load from API
   const {
-    data: influencer,
+    data: apiInfluencer,
     isLoading: loadingInfluencer,
     error: influencerError,
   } = useQuery({
     queryKey: ["influencer", username],
     queryFn: () => getInfluencer(username!),
-    enabled: !!username,
+    enabled: !!username && !isObjectId,
   });
+
+  // Build a unified influencer object
+  const influencer: Partial<InfluencerData> | undefined = isObjectId && dbCreator
+    ? {
+        _id: dbCreator.official_id,
+        username: dbCreator.username,
+        name: dbCreator.name,
+        userProfileImage: dbCreator.profile_pic,
+        coverPic: dbCreator.cover_pic,
+        userBio: dbCreator.bio,
+        category: dbCreator.category,
+        followerCount: dbCreator.follower_count,
+        videoCount: dbCreator.video_count,
+        postCount: dbCreator.post_count,
+        isVerified: dbCreator.is_verified,
+      }
+    : apiInfluencer;
+
+  const influencerId = influencer?._id || (isObjectId && dbCreator?.official_id);
 
   const PAGE_SIZE = 10;
 
@@ -160,14 +198,14 @@ export default function CreatorProfile() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["posts", influencer?._id],
-    queryFn: ({ pageParam = 0 }) => getInfluencerPosts(influencer!._id, pageParam, PAGE_SIZE),
+    queryKey: ["posts", influencerId],
+    queryFn: ({ pageParam = 0 }) => getInfluencerPosts(influencerId!, pageParam, PAGE_SIZE),
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < PAGE_SIZE) return undefined;
       return allPages.reduce((sum, page) => sum + page.length, 0);
     },
     initialPageParam: 0,
-    enabled: !!influencer?._id,
+    enabled: !!influencerId,
   });
 
   const posts = postsData?.pages.flat() ?? [];
