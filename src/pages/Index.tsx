@@ -1,13 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
 import Navbar from "@/components/Navbar";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { getStoredCreators, discoverCreator, bulkDiscoverCreators, formatCount, type StoredCreator } from "@/lib/api";
-import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Search, UserPlus, Users, Video, Eye, Loader2, ChevronLeft, ChevronRight, RefreshCw, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 20;
+
+function getVisitedCreators(): Set<string> {
+  try {
+    const stored = localStorage.getItem("visited_creators");
+    return new Set(stored ? JSON.parse(stored) : []);
+  } catch { return new Set(); }
+}
+
+function markCreatorVisited(username: string) {
+  const visited = getVisitedCreators();
+  visited.add(username);
+  localStorage.setItem("visited_creators", JSON.stringify([...visited]));
+}
 
 
 export default function Index() {
