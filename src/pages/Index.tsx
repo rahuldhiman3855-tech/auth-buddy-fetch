@@ -284,7 +284,7 @@ export default function Index() {
     });
 
   // Filter by search
-  const [filterQuery, setFilterQuery] = useState("");
+  const filteredUnpinned = filterQuery.trim()
   const filteredUnpinned = filterQuery.trim()
     ? unpinnedCreators.filter(
         (c) =>
