@@ -181,11 +181,18 @@ export default function Index() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {creators.map((c) => (
+            {creators.map((c) => {
+              const isVisited = visitedSet.has(c.username);
+              return (
               <Link
                 key={c.id}
                 to={`/creator/${c.username}`}
-                className="group rounded-xl border border-border bg-card hover:border-primary/50 hover:shadow-lg transition-all overflow-hidden"
+                onClick={() => handleCreatorClick(c.username)}
+                className={`group rounded-xl border overflow-hidden transition-all ${
+                  isVisited
+                    ? "border-primary/30 bg-primary/5 hover:border-primary/60 hover:shadow-lg"
+                    : "border-border bg-card hover:border-primary/50 hover:shadow-lg"
+                }`}
               >
                 {/* Cover */}
                 <div className="h-24 bg-gradient-to-br from-primary/20 to-accent/20 relative overflow-hidden">
