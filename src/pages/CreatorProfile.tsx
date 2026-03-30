@@ -299,29 +299,55 @@ export default function CreatorProfile() {
             </div>
 
             <section className="mt-8">
-              <h2 className="text-lg font-bold text-foreground mb-4">📺 Videos & Posts ({posts.length})</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 className="text-lg font-bold text-foreground">📺 Page {currentPage} of {Math.ceil(totalPosts / PAGE_SIZE) || 1}</h2>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    disabled={currentPage <= 1 || fetchingPosts}
+                    className="rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-40 hover:bg-accent transition-colors"
+                  >
+                    ← Prev
+                  </button>
+                  <form onSubmit={(e) => { e.preventDefault(); handleGotoPage(); }} className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={1}
+                      max={Math.ceil(totalPosts / PAGE_SIZE) || 1}
+                      value={gotoInput}
+                      onChange={(e) => setGotoInput(e.target.value)}
+                      placeholder="Page #"
+                      className="w-20 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <button type="submit" disabled={!gotoInput || fetchingPosts} className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors">
+                      Go
+                    </button>
+                  </form>
+                  <button
+                    onClick={() => { setCurrentPage(p => p + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    disabled={posts.length < PAGE_SIZE || fetchingPosts}
+                    className="rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-40 hover:bg-accent transition-colors"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
 
-              {loadingPosts && (
+              {(loadingPosts || fetchingPosts) && (
                 <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
               )}
 
-              {posts.length > 0 ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                    {posts.filter(p => !p.isDeleted && !p.isHided).map(post => (
-                      <PostCard key={post._id} post={post} onPlay={(p) => {
-                        setActivePost(p);
-                        setActiveMediaUrl(getPlayableMediaProxyUrl(p));
-                      }} />
-                    ))}
-                  </div>
-                  <div ref={loadMoreRef} className="flex items-center justify-center py-8">
-                    {isFetchingNextPage && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
-                    {!hasNextPage && posts.length > PAGE_SIZE && <p className="text-xs text-muted-foreground">No more posts</p>}
-                  </div>
-                </>
+              {posts.length > 0 && !loadingPosts ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {posts.filter(p => !p.isDeleted && !p.isHided).map(post => (
+                    <PostCard key={post._id} post={post} onPlay={(p) => {
+                      setActivePost(p);
+                      setActiveMediaUrl(getPlayableMediaProxyUrl(p));
+                    }} />
+                  ))}
+                </div>
               ) : (
-                !loadingPosts && (
+                !loadingPosts && !fetchingPosts && (
                   <div className="flex flex-col items-center py-16 text-muted-foreground">
                     <p className="text-4xl mb-3">🎬</p><p className="text-sm">No posts yet</p>
                   </div>
