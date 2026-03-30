@@ -56,7 +56,8 @@ interface FeedPost extends PostData {
 }
 
 function FeedPostCard({ post, onPlay }: { post: FeedPost; onPlay: (p: FeedPost) => void }) {
-  const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
+  const rawThumb = post.thumbnailLocation || post.thumbnailUrl || "";
+  const thumb = rawThumb ? proxyUrl(rawThumb) : "";
   const title = decodeContent(post.content) || "Untitled";
   const duration = formatDuration(post.duration);
   const creator = post._creator;
