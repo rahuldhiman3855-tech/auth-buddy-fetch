@@ -497,25 +497,32 @@ export default function Index() {
           </div>
         )}
 
-        {/* Load More Button */}
-        <div className="flex items-center justify-center py-8">
+        {/* Bottom pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 py-4">
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground">Page {safePage} of {totalPages}</span>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage >= totalPages} onClick={() => goToPage(safePage + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Load More Creators */}
+        <div className="flex items-center justify-center py-4">
           {loadingMore ? (
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           ) : hasMoreCreators ? (
-            <Button
-              onClick={loadMore}
-              variant="outline"
-              className="gap-2"
-            >
-              <HardDrive className="h-4 w-4" />
-              Load More
+            <Button onClick={loadMore} variant="outline" className="gap-2">
+              <HardDrive className="h-4 w-4" /> Load More Creators
             </Button>
           ) : (
             <p className="text-xs text-muted-foreground">All creators loaded</p>
           )}
         </div>
 
-        {/* Infinite scroll trigger (optional, can be removed if only button is desired) */}
         <div ref={loadMoreRef} className="h-4" />
       </main>
 
