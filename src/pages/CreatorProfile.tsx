@@ -17,13 +17,51 @@ import {
 } from "lucide-react";
 
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
-function proxyUrl(url?: string): string {
-  if (!url) return "";
-  return `${PROXY_BASE}?url=${encodeURIComponent(url)}`;
+function proxyUrl(url?: string | null, options: { alt?: string | null; download?: boolean } = {}): string {
+  const params = new URLSearchParams();
+  if (url) params.set("url", url);
+  if (options.alt) params.set("alt", options.alt);
+  if (options.download) params.set("download", "true");
+  return params.size > 0 ? `${PROXY_BASE}?${params.toString()}` : "";
+}
+
+function deriveOriginalMediaUrl(thumbnailUrl?: string | null): string {
+  if (!thumbnailUrl) return "";
+  const match = thumbnailUrl.match(/\/media\/(.+)\.jpg$/);
+  return match ? `https://cdn.official.me/media/${match[1]}` : "";
+}
+
+function getMediaCandidates(post: Pick<PostData, "location" | "mediaUrl" | "thumbnailLocation" | "thumbnailUrl">) {
+  const current = post.location || post.mediaUrl || "";
+  const original = deriveOriginalMediaUrl(post.thumbnailLocation || post.thumbnailUrl || "");
+
+  if (current.includes("/media/compressed/")) {
+    return { primary: original || current, fallback: current };
+  }
+
+  return {
+    primary: current || original,
+    fallback: original && original !== current ? original : "",
+  };
+}
+
+function getThumbnailProxyUrl(post: Pick<PostData, "thumbnailLocation" | "thumbnailUrl">): string {
+  const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
+  return thumb ? proxyUrl(thumb) : "";
+}
+
+function getPlayableMediaProxyUrl(post: Pick<PostData, "location" | "mediaUrl" | "thumbnailLocation" | "thumbnailUrl">): string {
+  const { primary, fallback } = getMediaCandidates(post);
+  return primary ? proxyUrl(primary, { alt: fallback }) : "";
+}
+
+function getDownloadProxyUrl(post: Pick<PostData, "location" | "mediaUrl" | "thumbnailLocation" | "thumbnailUrl">): string {
+  const { primary, fallback } = getMediaCandidates(post);
+  return primary ? proxyUrl(primary, { alt: fallback, download: true }) : "";
 }
 
 function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) => void }) {
-  const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
+  const thumb = getThumbnailProxyUrl(post);
   const title = decodeContent(post.content) || "Untitled";
   const duration = formatDuration(post.duration);
   const ref = useRef<HTMLDivElement>(null);
@@ -71,11 +109,11 @@ function PostCard({ post, onPlay }: { post: PostData; onPlay: (post: PostData) =
           </span>
         )}
 
-        {(post.location || post.mediaUrl) && (
+        {(post.location || post.mediaUrl || post.thumbnailLocation || post.thumbnailUrl) && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              window.open(proxyUrl(post.location || post.mediaUrl || ""), "_blank");
+              window.open(getDownloadProxyUrl(post), "_blank");
             }}
             className="absolute top-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white hover:bg-primary transition-colors opacity-0 group-hover:opacity-100"
             title="Download"
@@ -275,7 +313,7 @@ export default function CreatorProfile() {
                     {posts.filter(p => !p.isDeleted && !p.isHided).map(post => (
                       <PostCard key={post._id} post={post} onPlay={(p) => {
                         setActivePost(p);
-                        setActiveMediaUrl(p.location || p.mediaUrl || "");
+                        setActiveMediaUrl(getPlayableMediaProxyUrl(p));
                       }} />
                     ))}
                   </div>
@@ -304,9 +342,9 @@ export default function CreatorProfile() {
               <div className="rounded-xl overflow-hidden bg-black">
                 {activeMediaUrl ? (
                   activePost.type === "Video" ? (
-                    <video src={proxyUrl(activeMediaUrl)} controls autoPlay className="w-full max-h-[80vh]" poster={activePost.thumbnailLocation || activePost.thumbnailUrl || ""} />
+                    <video src={activeMediaUrl} controls autoPlay className="w-full max-h-[80vh]" poster={getThumbnailProxyUrl(activePost)} />
                   ) : (
-                    <img src={proxyUrl(activeMediaUrl)} alt={decodeContent(activePost.content)} className="w-full max-h-[80vh] object-contain" />
+                    <img src={activeMediaUrl} alt={decodeContent(activePost.content)} className="w-full max-h-[80vh] object-contain" />
                   )
                 ) : (
                   <div className="flex items-center justify-center py-32 text-muted-foreground"><p>No media available</p></div>
