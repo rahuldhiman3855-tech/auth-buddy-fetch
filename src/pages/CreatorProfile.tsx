@@ -193,20 +193,16 @@ export default function CreatorProfile() {
 
   const influencerId = influencer?._id || (isObjectId && dbCreator?.official_id);
 
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 20;
+  const skip = (currentPage - 1) * PAGE_SIZE;
 
-  const { data: postsData, isLoading: loadingPosts, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["posts", influencerId],
-    queryFn: ({ pageParam = 0 }) => getInfluencerPosts(influencerId!, pageParam, PAGE_SIZE),
-    getNextPageParam: (lastPage, allPages) => {
-      if (lastPage.length < PAGE_SIZE) return undefined;
-      return allPages.reduce((sum, page) => sum + page.length, 0);
-    },
-    initialPageParam: 0,
+  const { data: posts = [], isLoading: loadingPosts, isFetching: fetchingPosts } = useQuery({
+    queryKey: ["posts", influencerId, currentPage],
+    queryFn: () => getInfluencerPosts(influencerId!, skip, PAGE_SIZE),
     enabled: !!influencerId,
   });
 
-  const posts = postsData?.pages.flat() ?? [];
+  const totalPages = Math.ceil(totalPosts / PAGE_SIZE) || 1;
 
   // Cache posts to DB in background
   useEffect(() => {
