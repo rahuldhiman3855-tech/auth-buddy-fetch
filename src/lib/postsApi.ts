@@ -83,6 +83,9 @@ export async function getStoredPosts(params: PostFilterParams): Promise<{ data: 
     case "duration_desc":
       query = query.order("duration", { ascending: false });
       break;
+    case "duration_asc":
+      query = query.order("duration", { ascending: true });
+      break;
     default:
       query = query.order("post_date", { ascending: false });
   }
