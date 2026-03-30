@@ -101,7 +101,7 @@ function FeedPostCard({ post, onPlay }: { post: FeedPost; onPlay: (p: FeedPost) 
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
-  useEffect(() => {
+  useEffect(()(() => {
     if (!ref.current) return;
     const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } }, { rootMargin: "200px" });
     obs.observe(ref.current);
@@ -282,7 +282,7 @@ export default function Index() {
     return () => { cancelled = true; };
   }, [typeFilter, searchQuery]); // Re-fetch when filters change
 
-  // Load more creators on scroll
+  // Load more creators on scroll or button click
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMoreCreators) return;
     setLoadingMore(true);
@@ -302,7 +302,7 @@ export default function Index() {
     }
   }, [creatorPage, loadingMore, hasMoreCreators, loadBatch]);
 
-  // Intersection observer for infinite scroll
+  // Intersection observer for infinite scroll (optional, can be removed if only button is desired)
   useEffect(() => {
     if (!loadMoreRef.current) return;
     const obs = new IntersectionObserver(([e]) => {
@@ -410,13 +410,26 @@ export default function Index() {
           </div>
         )}
 
-        {/* Infinite scroll trigger */}
-        <div ref={loadMoreRef} className="flex items-center justify-center py-8">
-          {loadingMore && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
-          {!hasMoreCreators && feedPosts.length > 0 && (
+        {/* Load More Button */}
+        <div className="flex items-center justify-center py-8">
+          {loadingMore ? (
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          ) : hasMoreCreators ? (
+            <Button
+              onClick={loadMore}
+              variant="outline"
+              className="gap-2"
+            >
+              <HardDrive className="h-4 w-4" />
+              Load More
+            </Button>
+          ) : (
             <p className="text-xs text-muted-foreground">All creators loaded</p>
           )}
         </div>
+
+        {/* Infinite scroll trigger (optional, can be removed if only button is desired) */}
+        <div ref={loadMoreRef} className="h-4" />
       </main>
 
       {/* Media Modal */}
