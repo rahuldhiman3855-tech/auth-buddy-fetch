@@ -17,9 +17,47 @@ import { Input } from "@/components/ui/input";
 const PAGE_SIZE = 12;
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
 
-function proxyUrl(url?: string | null): string {
-  if (!url) return "";
-  return `${PROXY_BASE}?url=${encodeURIComponent(url)}`;
+function proxyUrl(url?: string | null, options: { alt?: string | null; download?: boolean } = {}): string {
+  const params = new URLSearchParams();
+  if (url) params.set("url", url);
+  if (options.alt) params.set("alt", options.alt);
+  if (options.download) params.set("download", "true");
+  return params.size > 0 ? `${PROXY_BASE}?${params.toString()}` : "";
+}
+
+function deriveOriginalMediaUrl(thumbnailUrl?: string | null): string {
+  if (!thumbnailUrl) return "";
+  const match = thumbnailUrl.match(/\/media\/(.+)\.jpg$/);
+  return match ? `https://cdn.official.me/media/${match[1]}` : "";
+}
+
+function getMediaCandidates(post: Pick<PostData, "location" | "mediaUrl" | "thumbnailLocation" | "thumbnailUrl">) {
+  const current = post.location || post.mediaUrl || "";
+  const original = deriveOriginalMediaUrl(post.thumbnailLocation || post.thumbnailUrl || "");
+
+  if (current.includes("/media/compressed/")) {
+    return { primary: original || current, fallback: current };
+  }
+
+  return {
+    primary: current || original,
+    fallback: original && original !== current ? original : "",
+  };
+}
+
+function getThumbnailProxyUrl(post: Pick<PostData, "thumbnailLocation" | "thumbnailUrl">): string {
+  const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
+  return thumb ? proxyUrl(thumb) : "";
+}
+
+function getPlayableMediaProxyUrl(post: Pick<PostData, "location" | "mediaUrl" | "thumbnailLocation" | "thumbnailUrl">): string {
+  const { primary, fallback } = getMediaCandidates(post);
+  return primary ? proxyUrl(primary, { alt: fallback }) : "";
+}
+
+function getDownloadProxyUrl(post: Pick<PostData, "location" | "mediaUrl" | "thumbnailLocation" | "thumbnailUrl">): string {
+  const { primary, fallback } = getMediaCandidates(post);
+  return primary ? proxyUrl(primary, { alt: fallback, download: true }) : "";
 }
 
 /** Upsert a batch of API posts into the DB in the background */
@@ -56,8 +94,7 @@ interface FeedPost extends PostData {
 }
 
 function FeedPostCard({ post, onPlay }: { post: FeedPost; onPlay: (p: FeedPost) => void }) {
-  const rawThumb = post.thumbnailLocation || post.thumbnailUrl || "";
-  const thumb = rawThumb ? proxyUrl(rawThumb) : "";
+  const thumb = getThumbnailProxyUrl(post);
   const title = decodeContent(post.content) || "Untitled";
   const duration = formatDuration(post.duration);
   const creator = post._creator;
@@ -106,12 +143,11 @@ function FeedPostCard({ post, onPlay }: { post: FeedPost; onPlay: (p: FeedPost) 
           </span>
         )}
 
-        {(post.location || post.mediaUrl) && (
+        {(post.location || post.mediaUrl || post.thumbnailLocation || post.thumbnailUrl) && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              const url = post.location || post.mediaUrl || "";
-              window.open(proxyUrl(url), "_blank");
+              window.open(getDownloadProxyUrl(post), "_blank");
             }}
             className="absolute top-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white hover:bg-primary transition-colors opacity-0 group-hover:opacity-100"
             title="Download"
@@ -289,7 +325,7 @@ export default function Index() {
 
   const handlePlayPost = (post: FeedPost) => {
     setActivePost(post);
-    setActiveMediaUrl(post.location || post.mediaUrl || "");
+    setActiveMediaUrl(getPlayableMediaProxyUrl(post));
   };
 
   const clearFilters = () => {
@@ -400,15 +436,15 @@ export default function Index() {
               {activeMediaUrl ? (
                 activePost.type === "Video" ? (
                   <video
-                    src={proxyUrl(activeMediaUrl)}
+                    src={activeMediaUrl}
                     controls
                     autoPlay
                     className="w-full max-h-[80vh]"
-                    poster={activePost.thumbnailLocation || activePost.thumbnailUrl || ""}
+                    poster={getThumbnailProxyUrl(activePost)}
                   />
                 ) : (
                   <img
-                    src={proxyUrl(activeMediaUrl)}
+                    src={activeMediaUrl}
                     alt={decodeContent(activePost.content)}
                     className="w-full max-h-[80vh] object-contain"
                   />
