@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useRef, useEffect, useState } from "react";
 import {
   getInfluencer,
@@ -202,7 +202,7 @@ export default function CreatorProfile() {
     enabled: !!influencerId,
   });
 
-  const totalPages = Math.ceil(totalPosts / PAGE_SIZE) || 1;
+  // totalPages computed after totalPosts is defined below
 
   // Cache posts to DB in background
   useEffect(() => {
@@ -232,15 +232,15 @@ export default function CreatorProfile() {
     }
   }, [posts.length, influencerId]);
 
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!loadMoreRef.current || !hasNextPage) return;
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage();
-    }, { threshold: 0.1 });
-    obs.observe(loadMoreRef.current);
-    return () => obs.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const handleGotoPage = () => {
+    const p = parseInt(gotoInput, 10);
+    const totalPages = Math.ceil(totalPosts / PAGE_SIZE) || 1;
+    if (p >= 1 && p <= totalPages) {
+      setCurrentPage(p);
+      setGotoInput("");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   const profileImage = proxyUrl(influencer?.userProfileImage || influencer?.profilePic);
   const bio = influencer?.userBio || influencer?.bio || "";
