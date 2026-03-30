@@ -9,7 +9,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import {
   Search, Video, Image, Loader2, Play, Eye, Heart, Clock, Download,
-  HardDrive, Filter, X, Calendar
+  HardDrive, Filter, X, Calendar, ChevronLeft, ChevronRight, ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
