@@ -9,12 +9,15 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import {
   Search, Video, Image, Loader2, Play, Eye, Heart, Clock, Download,
-  HardDrive, Filter, X, Calendar
+  HardDrive, Filter, X, Calendar, ChevronLeft, ChevronRight, ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
-const PAGE_SIZE = 12;
+const DISPLAY_PAGE_SIZE = 24;
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
 
 function proxyUrl(url?: string | null, options: { alt?: string | null; download?: boolean } = {}): string {
@@ -218,12 +221,50 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "all");
 
+  // Sorting
+  const [sortBy, setSortBy] = useState<string>("date");
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [gotoInput, setGotoInput] = useState("1");
+
   const [activePost, setActivePost] = useState<FeedPost | null>(null);
   const [activeMediaUrl, setActiveMediaUrl] = useState("");
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   const CREATORS_PER_BATCH = 5;
+
+  // Sorted + paginated posts
+  const sortedPosts = [...feedPosts].sort((a, b) => {
+    switch (sortBy) {
+      case "duration_asc":
+        return (a.duration ?? 0) - (b.duration ?? 0);
+      case "duration_desc":
+        return (b.duration ?? 0) - (a.duration ?? 0);
+      case "size_desc":
+        return (b.fileSizeInMB ?? 0) - (a.fileSizeInMB ?? 0);
+      case "views_desc":
+        return (b.viewCount ?? 0) - (a.viewCount ?? 0);
+      case "date":
+      default: {
+        const da = a.date || a.created_at || "";
+        const db = b.date || b.created_at || "";
+        return db.localeCompare(da);
+      }
+    }
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sortedPosts.length / DISPLAY_PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedPosts = sortedPosts.slice((safePage - 1) * DISPLAY_PAGE_SIZE, safePage * DISPLAY_PAGE_SIZE);
+
+  const goToPage = (p: number) => {
+    const clamped = Math.max(1, Math.min(p, totalPages));
+    setCurrentPage(clamped);
+    setGotoInput(String(clamped));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Load a batch of creators and fetch their posts from the API
   const loadBatch = useCallback(async (creatorsToLoad: StoredCreator[], append: boolean) => {
@@ -232,7 +273,7 @@ export default function Index() {
     await Promise.allSettled(
       creatorsToLoad.map(async (creator) => {
         try {
-          const posts = await getInfluencerPosts(creator.official_id, 0, PAGE_SIZE);
+          const posts = await getInfluencerPosts(creator.official_id, 0, DISPLAY_PAGE_SIZE);
           const feedItems: FeedPost[] = posts
             .filter(p => !p.isDeleted && !p.isHided)
             .filter(p => typeFilter === "all" || p.type === typeFilter)
@@ -364,6 +405,8 @@ export default function Index() {
                   key={value}
                   onClick={() => {
                     setTypeFilter(value);
+                    setCurrentPage(1);
+                    setGotoInput("1");
                     const params: Record<string, string> = {};
                     if (searchQuery) params.q = searchQuery;
                     if (value !== "all") params.type = value;
@@ -380,6 +423,21 @@ export default function Index() {
               ))}
             </div>
 
+            {/* Sort by */}
+            <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setCurrentPage(1); setGotoInput("1"); }}>
+              <SelectTrigger className="w-auto h-8 text-xs gap-1">
+                <ArrowUpDown className="h-3.5 w-3.5" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Newest</SelectItem>
+                <SelectItem value="duration_desc">Duration ↓</SelectItem>
+                <SelectItem value="duration_asc">Duration ↑</SelectItem>
+                <SelectItem value="size_desc">Size ↓</SelectItem>
+                <SelectItem value="views_desc">Views ↓</SelectItem>
+              </SelectContent>
+            </Select>
+
             {hasFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs">
                 <X className="h-3.5 w-3.5 mr-1" /> Clear
@@ -388,47 +446,83 @@ export default function Index() {
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          {feedPosts.length} posts from {creators.length} creators
-        </p>
+        {/* Stats + Pagination header */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            {sortedPosts.length} posts from {creators.length} creators
+            {totalPages > 1 && ` · Page ${safePage} of ${totalPages}`}
+          </p>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={gotoInput}
+                  onChange={(e) => setGotoInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") goToPage(Number(gotoInput)); }}
+                  className="h-8 w-16 text-center text-xs"
+                />
+                <Button variant="secondary" size="sm" className="h-8 text-xs" onClick={() => goToPage(Number(gotoInput))}>
+                  Go
+                </Button>
+              </div>
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage >= totalPages} onClick={() => goToPage(safePage + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
 
         {/* Posts Grid */}
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : feedPosts.length === 0 ? (
+        ) : paginatedPosts.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             <Play className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>No posts found.</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {feedPosts.map((post) => (
+            {paginatedPosts.map((post) => (
               <FeedPostCard key={post._id} post={post} onPlay={handlePlayPost} />
             ))}
           </div>
         )}
 
-        {/* Load More Button */}
-        <div className="flex items-center justify-center py-8">
+        {/* Bottom pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 py-4">
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground">Page {safePage} of {totalPages}</span>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage >= totalPages} onClick={() => goToPage(safePage + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Load More Creators */}
+        <div className="flex items-center justify-center py-4">
           {loadingMore ? (
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           ) : hasMoreCreators ? (
-            <Button
-              onClick={loadMore}
-              variant="outline"
-              className="gap-2"
-            >
-              <HardDrive className="h-4 w-4" />
-              Load More
+            <Button onClick={loadMore} variant="outline" className="gap-2">
+              <HardDrive className="h-4 w-4" /> Load More Creators
             </Button>
           ) : (
             <p className="text-xs text-muted-foreground">All creators loaded</p>
           )}
         </div>
 
-        {/* Infinite scroll trigger (optional, can be removed if only button is desired) */}
         <div ref={loadMoreRef} className="h-4" />
       </main>
 
