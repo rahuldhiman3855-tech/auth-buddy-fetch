@@ -202,7 +202,7 @@ export default function CreatorProfile() {
     enabled: !!influencerId,
   });
 
-  // totalPages computed after totalPosts is defined below
+  
 
   // Cache posts to DB in background
   useEffect(() => {
