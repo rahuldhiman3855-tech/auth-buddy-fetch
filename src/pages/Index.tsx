@@ -221,12 +221,50 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "all");
 
+  // Sorting
+  const [sortBy, setSortBy] = useState<string>("date");
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [gotoInput, setGotoInput] = useState("1");
+
   const [activePost, setActivePost] = useState<FeedPost | null>(null);
   const [activeMediaUrl, setActiveMediaUrl] = useState("");
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   const CREATORS_PER_BATCH = 5;
+
+  // Sorted + paginated posts
+  const sortedPosts = [...feedPosts].sort((a, b) => {
+    switch (sortBy) {
+      case "duration_asc":
+        return (a.duration ?? 0) - (b.duration ?? 0);
+      case "duration_desc":
+        return (b.duration ?? 0) - (a.duration ?? 0);
+      case "size_desc":
+        return (b.fileSizeInMB ?? 0) - (a.fileSizeInMB ?? 0);
+      case "views_desc":
+        return (b.viewCount ?? 0) - (a.viewCount ?? 0);
+      case "date":
+      default: {
+        const da = a.date || a.created_at || "";
+        const db = b.date || b.created_at || "";
+        return db.localeCompare(da);
+      }
+    }
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sortedPosts.length / DISPLAY_PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedPosts = sortedPosts.slice((safePage - 1) * DISPLAY_PAGE_SIZE, safePage * DISPLAY_PAGE_SIZE);
+
+  const goToPage = (p: number) => {
+    const clamped = Math.max(1, Math.min(p, totalPages));
+    setCurrentPage(clamped);
+    setGotoInput(String(clamped));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Load a batch of creators and fetch their posts from the API
   const loadBatch = useCallback(async (creatorsToLoad: StoredCreator[], append: boolean) => {
