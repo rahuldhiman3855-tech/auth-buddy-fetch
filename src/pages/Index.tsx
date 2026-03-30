@@ -101,7 +101,7 @@ function FeedPostCard({ post, onPlay }: { post: FeedPost; onPlay: (p: FeedPost) 
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
-  useEffect(()(() => {
+  useEffect(() => {
     if (!ref.current) return;
     const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } }, { rootMargin: "200px" });
     obs.observe(ref.current);
