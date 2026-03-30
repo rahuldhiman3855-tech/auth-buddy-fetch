@@ -235,7 +235,7 @@ export default function Index() {
     await Promise.allSettled(
       creatorsToLoad.map(async (creator) => {
         try {
-          const posts = await getInfluencerPosts(creator.official_id, 0, PAGE_SIZE);
+          const posts = await getInfluencerPosts(creator.official_id, 0, DISPLAY_PAGE_SIZE);
           const feedItems: FeedPost[] = posts
             .filter(p => !p.isDeleted && !p.isHided)
             .filter(p => typeFilter === "all" || p.type === typeFilter)
