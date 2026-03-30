@@ -405,6 +405,8 @@ export default function Index() {
                   key={value}
                   onClick={() => {
                     setTypeFilter(value);
+                    setCurrentPage(1);
+                    setGotoInput("1");
                     const params: Record<string, string> = {};
                     if (searchQuery) params.q = searchQuery;
                     if (value !== "all") params.type = value;
@@ -421,6 +423,21 @@ export default function Index() {
               ))}
             </div>
 
+            {/* Sort by */}
+            <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setCurrentPage(1); setGotoInput("1"); }}>
+              <SelectTrigger className="w-auto h-8 text-xs gap-1">
+                <ArrowUpDown className="h-3.5 w-3.5" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Newest</SelectItem>
+                <SelectItem value="duration_desc">Duration ↓</SelectItem>
+                <SelectItem value="duration_asc">Duration ↑</SelectItem>
+                <SelectItem value="size_desc">Size ↓</SelectItem>
+                <SelectItem value="views_desc">Views ↓</SelectItem>
+              </SelectContent>
+            </Select>
+
             {hasFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs">
                 <X className="h-3.5 w-3.5 mr-1" /> Clear
@@ -429,23 +446,52 @@ export default function Index() {
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          {feedPosts.length} posts from {creators.length} creators
-        </p>
+        {/* Stats + Pagination header */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            {sortedPosts.length} posts from {creators.length} creators
+            {totalPages > 1 && ` · Page ${safePage} of ${totalPages}`}
+          </p>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={gotoInput}
+                  onChange={(e) => setGotoInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") goToPage(Number(gotoInput)); }}
+                  className="h-8 w-16 text-center text-xs"
+                />
+                <Button variant="secondary" size="sm" className="h-8 text-xs" onClick={() => goToPage(Number(gotoInput))}>
+                  Go
+                </Button>
+              </div>
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage >= totalPages} onClick={() => goToPage(safePage + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
 
         {/* Posts Grid */}
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : feedPosts.length === 0 ? (
+        ) : paginatedPosts.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             <Play className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>No posts found.</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {feedPosts.map((post) => (
+            {paginatedPosts.map((post) => (
               <FeedPostCard key={post._id} post={post} onPlay={handlePlayPost} />
             ))}
           </div>
