@@ -1,15 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   formatCount, formatDuration, decodeContent,
-  getInfluencerPosts, getStoredCreators,
-  type PostData, type StoredCreator,
+  type PostData,
 } from "@/lib/api";
-import { supabase } from "@/integrations/supabase/client";
+import { getStoredPosts, type StoredPost } from "@/lib/postsApi";
 import {
   Search, Video, Image, Loader2, Play, Eye, Heart, Clock, Download,
-  HardDrive, Filter, X, Calendar, ChevronLeft, ChevronRight, ArrowUpDown
+  HardDrive, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
-const DISPLAY_PAGE_SIZE = 24;
+const PAGE_SIZE = 24;
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
 
 function proxyUrl(url?: string | null, options: { alt?: string | null; download?: boolean } = {}): string {
@@ -34,73 +33,37 @@ function deriveOriginalMediaUrl(thumbnailUrl?: string | null): string {
   return match ? `https://cdn.official.me/media/${match[1]}` : "";
 }
 
-function getMediaCandidates(post: Pick<PostData, "location" | "mediaUrl" | "thumbnailLocation" | "thumbnailUrl">) {
-  const current = post.location || post.mediaUrl || "";
-  const original = deriveOriginalMediaUrl(post.thumbnailLocation || post.thumbnailUrl || "");
+function getMediaCandidates(post: { location?: string | null; media_url?: string | null; thumbnail_url?: string | null }) {
+  const current = post.location || post.media_url || "";
+  const original = deriveOriginalMediaUrl(post.thumbnail_url);
 
   if (current.includes("/media/compressed/")) {
     return { primary: original || current, fallback: current };
   }
-
   return {
     primary: current || original,
     fallback: original && original !== current ? original : "",
   };
 }
 
-function getThumbnailProxyUrl(post: Pick<PostData, "thumbnailLocation" | "thumbnailUrl">): string {
-  const thumb = post.thumbnailLocation || post.thumbnailUrl || "";
-  return thumb ? proxyUrl(thumb) : "";
+function getThumbnailProxyUrl(post: { thumbnail_url?: string | null }): string {
+  return post.thumbnail_url ? proxyUrl(post.thumbnail_url) : "";
 }
 
-function getPlayableMediaProxyUrl(post: Pick<PostData, "location" | "mediaUrl" | "thumbnailLocation" | "thumbnailUrl">): string {
+function getPlayableMediaProxyUrl(post: { location?: string | null; media_url?: string | null; thumbnail_url?: string | null }): string {
   const { primary, fallback } = getMediaCandidates(post);
   return primary ? proxyUrl(primary, { alt: fallback }) : "";
 }
 
-function getDownloadProxyUrl(post: Pick<PostData, "location" | "mediaUrl" | "thumbnailLocation" | "thumbnailUrl">): string {
+function getDownloadProxyUrl(post: { location?: string | null; media_url?: string | null; thumbnail_url?: string | null }): string {
   const { primary, fallback } = getMediaCandidates(post);
   return primary ? proxyUrl(primary, { alt: fallback, download: true }) : "";
 }
 
-/** Upsert a batch of API posts into the DB in the background */
-function cachePostsToDB(posts: PostData[], creator: StoredCreator) {
-  const rows = posts
-    .filter(p => !p.isDeleted && !p.isHided)
-    .map(p => ({
-      official_id: p._id,
-      creator_id: creator.official_id,
-      creator_username: creator.username,
-      creator_name: creator.name,
-      creator_profile_pic: creator.profile_pic,
-      content: decodeContent(p.content),
-      category: p.category || null,
-      type: p.type || null,
-      price: p.price ?? 0,
-      duration: p.duration ?? 0,
-      file_size_mb: p.fileSizeInMB ?? 0,
-      thumbnail_url: p.thumbnailLocation || p.thumbnailUrl || null,
-      media_url: p.mediaUrl || null,
-      location: p.location || null,
-      post_date: p.date || p.created_at || null,
-      view_count: p.viewCount ?? 0,
-      like_count: p.likeCount ?? (p.likes?.length ?? 0),
-      is_premium: p.isPremium ?? false,
-    }));
-  if (rows.length > 0) {
-    supabase.from("posts").upsert(rows, { onConflict: "official_id" }).then(() => {});
-  }
-}
-
-interface FeedPost extends PostData {
-  _creator: StoredCreator;
-}
-
-function FeedPostCard({ post, onPlay }: { post: FeedPost; onPlay: (p: FeedPost) => void }) {
+function FeedPostCard({ post, onPlay }: { post: StoredPost; onPlay: (p: StoredPost) => void }) {
   const thumb = getThumbnailProxyUrl(post);
-  const title = decodeContent(post.content) || "Untitled";
-  const duration = formatDuration(post.duration);
-  const creator = post._creator;
+  const title = post.content || "Untitled";
+  const duration = formatDuration(post.duration ?? undefined);
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -146,7 +109,7 @@ function FeedPostCard({ post, onPlay }: { post: FeedPost; onPlay: (p: FeedPost) 
           </span>
         )}
 
-        {(post.location || post.mediaUrl || post.thumbnailLocation || post.thumbnailUrl) && (
+        {(post.location || post.media_url || post.thumbnail_url) && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -165,10 +128,10 @@ function FeedPostCard({ post, onPlay }: { post: FeedPost; onPlay: (p: FeedPost) 
               {post.type}
             </span>
           )}
-          {post.fileSizeInMB && post.fileSizeInMB > 0 && (
+          {post.file_size_mb && post.file_size_mb > 0 && (
             <span className="flex items-center gap-1 rounded-md bg-emerald-600/80 px-2 py-0.5 text-[10px] font-semibold text-white">
               <HardDrive className="h-2.5 w-2.5" />
-              {post.fileSizeInMB >= 1 ? `${post.fileSizeInMB.toFixed(1)} MB` : `${(post.fileSizeInMB * 1024).toFixed(0)} KB`}
+              {post.file_size_mb >= 1 ? `${post.file_size_mb.toFixed(1)} MB` : `${(post.file_size_mb * 1024).toFixed(0)} KB`}
             </span>
           )}
         </div>
@@ -176,31 +139,31 @@ function FeedPostCard({ post, onPlay }: { post: FeedPost; onPlay: (p: FeedPost) 
 
       <div className="flex flex-col gap-1.5 p-3">
         <Link
-          to={`/creator/${creator.username}`}
+          to={`/creator/${post.creator_username}`}
           onClick={(e) => e.stopPropagation()}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
-          {creator.profile_pic ? (
-            <img src={creator.profile_pic} alt="" className="h-6 w-6 rounded-full object-cover ring-1 ring-primary/20" />
+          {post.creator_profile_pic ? (
+            <img src={post.creator_profile_pic} alt="" className="h-6 w-6 rounded-full object-cover ring-1 ring-primary/20" />
           ) : (
             <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
-              {(creator.name || "?")[0]?.toUpperCase()}
+              {(post.creator_name || "?")[0]?.toUpperCase()}
             </div>
           )}
-          <span className="text-xs text-muted-foreground truncate">{creator.name || creator.username}</span>
+          <span className="text-xs text-muted-foreground truncate">{post.creator_name || post.creator_username}</span>
         </Link>
 
         <h3 className="text-sm font-semibold text-card-foreground line-clamp-2 leading-tight">{title}</h3>
 
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {(post.viewCount ?? 0) > 0 && (
-            <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{formatCount(post.viewCount)}</span>
+          {(post.view_count ?? 0) > 0 && (
+            <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{formatCount(post.view_count ?? 0)}</span>
           )}
-          {post.likes && post.likes.length > 0 && (
-            <span className="flex items-center gap-1"><Heart className="h-3.5 w-3.5" />{formatCount(post.likes.length)}</span>
+          {(post.like_count ?? 0) > 0 && (
+            <span className="flex items-center gap-1"><Heart className="h-3.5 w-3.5" />{formatCount(post.like_count ?? 0)}</span>
           )}
-          {post.date && (
-            <span>{new Date(post.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}</span>
+          {post.post_date && (
+            <span>{new Date(post.post_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}</span>
           )}
         </div>
       </div>
@@ -210,161 +173,96 @@ function FeedPostCard({ post, onPlay }: { post: FeedPost; onPlay: (p: FeedPost) 
 
 export default function Index() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [creators, setCreators] = useState<StoredCreator[]>([]);
-  const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
+
+  // Read page from URL
+  const urlPage = Math.max(1, Number(searchParams.get("page")) || 1);
+
+  const [posts, setPosts] = useState<StoredPost[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [creatorPage, setCreatorPage] = useState(0);
-  const [hasMoreCreators, setHasMoreCreators] = useState(true);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "all");
-
-  // Sorting
-  const [sortBy, setSortBy] = useState<string>("date");
+  const [sortBy, setSortBy] = useState(searchParams.get("sort") || "date");
 
   // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [gotoInput, setGotoInput] = useState("1");
+  const [currentPage, setCurrentPage] = useState(urlPage);
+  const [gotoInput, setGotoInput] = useState(String(urlPage));
 
-  const [activePost, setActivePost] = useState<FeedPost | null>(null);
+  const [activePost, setActivePost] = useState<StoredPost | null>(null);
   const [activeMediaUrl, setActiveMediaUrl] = useState("");
-  const loadMoreRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
 
-  const CREATORS_PER_BATCH = 5;
-
-  // Sorted + paginated posts
-  const sortedPosts = [...feedPosts].sort((a, b) => {
-    switch (sortBy) {
-      case "duration_asc":
-        return (a.duration ?? 0) - (b.duration ?? 0);
-      case "duration_desc":
-        return (b.duration ?? 0) - (a.duration ?? 0);
-      case "size_desc":
-        return (b.fileSizeInMB ?? 0) - (a.fileSizeInMB ?? 0);
-      case "views_desc":
-        return (b.viewCount ?? 0) - (a.viewCount ?? 0);
-      case "date":
-      default: {
-        const da = a.date || a.created_at || "";
-        const db = b.date || b.created_at || "";
-        return db.localeCompare(da);
-      }
-    }
-  });
-
-  const totalPages = Math.max(1, Math.ceil(sortedPosts.length / DISPLAY_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
-  const paginatedPosts = sortedPosts.slice((safePage - 1) * DISPLAY_PAGE_SIZE, safePage * DISPLAY_PAGE_SIZE);
 
-  const goToPage = (p: number) => {
-    const clamped = Math.max(1, Math.min(p, totalPages));
-    setCurrentPage(clamped);
-    setGotoInput(String(clamped));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  // Update URL params
+  const updateParams = (overrides: Record<string, string | undefined> = {}) => {
+    const p: Record<string, string> = {};
+    const page = overrides.page ?? String(currentPage);
+    const q = overrides.q ?? searchQuery;
+    const type = overrides.type ?? typeFilter;
+    const sort = overrides.sort ?? sortBy;
+    if (Number(page) > 1) p.page = page;
+    if (q) p.q = q;
+    if (type && type !== "all") p.type = type;
+    if (sort && sort !== "date") p.sort = sort;
+    setSearchParams(p);
   };
 
-  // Load a batch of creators and fetch their posts from the API
-  const loadBatch = useCallback(async (creatorsToLoad: StoredCreator[], append: boolean) => {
-    const allNewPosts: FeedPost[] = [];
-
-    await Promise.allSettled(
-      creatorsToLoad.map(async (creator) => {
-        try {
-          const posts = await getInfluencerPosts(creator.official_id, 0, DISPLAY_PAGE_SIZE);
-          const feedItems: FeedPost[] = posts
-            .filter(p => !p.isDeleted && !p.isHided)
-            .filter(p => typeFilter === "all" || p.type === typeFilter)
-            .filter(p => {
-              if (!searchQuery) return true;
-              const title = decodeContent(p.content) || "";
-              return title.toLowerCase().includes(searchQuery.toLowerCase());
-            })
-            .map(p => ({ ...p, _creator: creator }));
-          allNewPosts.push(...feedItems);
-          // Cache to DB in background
-          cachePostsToDB(posts, creator);
-        } catch (e) {
-          console.error(`Failed to load posts for ${creator.username}:`, e);
-        }
-      })
-    );
-
-    // Sort by date descending
-    allNewPosts.sort((a, b) => {
-      const da = a.date || a.created_at || "";
-      const db = b.date || b.created_at || "";
-      return db.localeCompare(da);
-    });
-
-    setFeedPosts(prev => append ? [...prev, ...allNewPosts] : allNewPosts);
-  }, [typeFilter, searchQuery]);
-
-  // Initial load: get creators then fetch their posts
+  // Fetch posts from DB
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const { data: creatorsData, count } = await getStoredCreators(0, CREATORS_PER_BATCH);
+        const offset = (safePage - 1) * PAGE_SIZE;
+        const sortMap: Record<string, string> = {
+          date: "date_desc",
+          duration_desc: "duration_desc",
+          duration_asc: "date_asc", // we'll handle duration_asc below
+          size_desc: "size_desc",
+          views_desc: "views_desc",
+        };
+        const { data, count } = await getStoredPosts({
+          offset,
+          limit: PAGE_SIZE,
+          type: typeFilter !== "all" ? typeFilter : undefined,
+          search: searchQuery || undefined,
+          sortBy: sortMap[sortBy] || undefined,
+        });
         if (cancelled) return;
-        setCreators(creatorsData);
-        setCreatorPage(1);
-        setHasMoreCreators(creatorsData.length < count);
-        await loadBatch(creatorsData, false);
+        setPosts(data);
+        setTotalCount(count);
       } catch (e) {
-        console.error("Failed to load feed:", e);
+        console.error("Failed to load posts:", e);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [typeFilter, searchQuery]); // Re-fetch when filters change
+  }, [safePage, typeFilter, searchQuery, sortBy]);
 
-  // Load more creators on scroll or button click
-  const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMoreCreators) return;
-    setLoadingMore(true);
-    try {
-      const offset = creatorPage * CREATORS_PER_BATCH;
-      const { data: moreCreators, count } = await getStoredCreators(offset, CREATORS_PER_BATCH);
-      if (moreCreators.length === 0) {
-        setHasMoreCreators(false);
-        return;
-      }
-      setCreators(prev => [...prev, ...moreCreators]);
-      setCreatorPage(prev => prev + 1);
-      setHasMoreCreators(offset + moreCreators.length < count);
-      await loadBatch(moreCreators, true);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [creatorPage, loadingMore, hasMoreCreators, loadBatch]);
-
-  // Intersection observer for infinite scroll (optional, can be removed if only button is desired)
-  useEffect(() => {
-    if (!loadMoreRef.current) return;
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) loadMore();
-    }, { threshold: 0.1 });
-    obs.observe(loadMoreRef.current);
-    return () => obs.disconnect();
-  }, [loadMore]);
+  const goToPage = (p: number) => {
+    const clamped = Math.max(1, Math.min(p, totalPages));
+    setCurrentPage(clamped);
+    setGotoInput(String(clamped));
+    updateParams({ page: String(clamped) });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const handleSearchChange = (val: string) => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
       setSearchQuery(val);
-      const params: Record<string, string> = {};
-      if (val) params.q = val;
-      if (typeFilter !== "all") params.type = typeFilter;
-      setSearchParams(params);
+      setCurrentPage(1);
+      setGotoInput("1");
+      updateParams({ q: val, page: "1" });
     }, 500);
   };
 
-  const handlePlayPost = (post: FeedPost) => {
+  const handlePlayPost = (post: StoredPost) => {
     setActivePost(post);
     setActiveMediaUrl(getPlayableMediaProxyUrl(post));
   };
@@ -372,10 +270,42 @@ export default function Index() {
   const clearFilters = () => {
     setSearchQuery("");
     setTypeFilter("all");
+    setSortBy("date");
+    setCurrentPage(1);
+    setGotoInput("1");
     setSearchParams({});
   };
 
-  const hasFilters = searchQuery || typeFilter !== "all";
+  const hasFilters = searchQuery || typeFilter !== "all" || sortBy !== "date";
+
+  // Pagination controls component
+  const PaginationControls = () => (
+    totalPages > 1 ? (
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex items-center gap-1">
+          <Input
+            type="number"
+            min={1}
+            max={totalPages}
+            value={gotoInput}
+            onChange={(e) => setGotoInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") goToPage(Number(gotoInput)); }}
+            className="h-8 w-16 text-center text-xs"
+          />
+          <span className="text-xs text-muted-foreground">/ {totalPages}</span>
+          <Button variant="secondary" size="sm" className="h-8 text-xs" onClick={() => goToPage(Number(gotoInput))}>
+            Go
+          </Button>
+        </div>
+        <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage >= totalPages} onClick={() => goToPage(safePage + 1)}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    ) : null
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -407,10 +337,7 @@ export default function Index() {
                     setTypeFilter(value);
                     setCurrentPage(1);
                     setGotoInput("1");
-                    const params: Record<string, string> = {};
-                    if (searchQuery) params.q = searchQuery;
-                    if (value !== "all") params.type = value;
-                    setSearchParams(params);
+                    updateParams({ type: value, page: "1" });
                   }}
                   className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     typeFilter === value
@@ -424,7 +351,12 @@ export default function Index() {
             </div>
 
             {/* Sort by */}
-            <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setCurrentPage(1); setGotoInput("1"); }}>
+            <Select value={sortBy} onValueChange={(v) => {
+              setSortBy(v);
+              setCurrentPage(1);
+              setGotoInput("1");
+              updateParams({ sort: v, page: "1" });
+            }}>
               <SelectTrigger className="w-auto h-8 text-xs gap-1">
                 <ArrowUpDown className="h-3.5 w-3.5" />
                 <SelectValue />
@@ -449,34 +381,9 @@ export default function Index() {
         {/* Stats + Pagination header */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
-            {sortedPosts.length} posts from {creators.length} creators
-            {totalPages > 1 && ` · Page ${safePage} of ${totalPages}`}
+            {totalCount} posts · Page {safePage} of {totalPages}
           </p>
-
-          {totalPages > 1 && (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-1">
-                <Input
-                  type="number"
-                  min={1}
-                  max={totalPages}
-                  value={gotoInput}
-                  onChange={(e) => setGotoInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") goToPage(Number(gotoInput)); }}
-                  className="h-8 w-16 text-center text-xs"
-                />
-                <Button variant="secondary" size="sm" className="h-8 text-xs" onClick={() => goToPage(Number(gotoInput))}>
-                  Go
-                </Button>
-              </div>
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage >= totalPages} onClick={() => goToPage(safePage + 1)}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+          <PaginationControls />
         </div>
 
         {/* Posts Grid */}
@@ -484,46 +391,23 @@ export default function Index() {
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : paginatedPosts.length === 0 ? (
+        ) : posts.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             <Play className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>No posts found.</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {paginatedPosts.map((post) => (
-              <FeedPostCard key={post._id} post={post} onPlay={handlePlayPost} />
+            {posts.map((post) => (
+              <FeedPostCard key={post.id} post={post} onPlay={handlePlayPost} />
             ))}
           </div>
         )}
 
         {/* Bottom pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 py-4">
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-xs text-muted-foreground">Page {safePage} of {totalPages}</span>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage >= totalPages} onClick={() => goToPage(safePage + 1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        {/* Load More Creators */}
         <div className="flex items-center justify-center py-4">
-          {loadingMore ? (
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          ) : hasMoreCreators ? (
-            <Button onClick={loadMore} variant="outline" className="gap-2">
-              <HardDrive className="h-4 w-4" /> Load More Creators
-            </Button>
-          ) : (
-            <p className="text-xs text-muted-foreground">All creators loaded</p>
-          )}
+          <PaginationControls />
         </div>
-
-        <div ref={loadMoreRef} className="h-4" />
       </main>
 
       {/* Media Modal */}
@@ -552,7 +436,7 @@ export default function Index() {
                 ) : (
                   <img
                     src={activeMediaUrl}
-                    alt={decodeContent(activePost.content)}
+                    alt={activePost.content || ""}
                     className="w-full max-h-[80vh] object-contain"
                   />
                 )
@@ -563,17 +447,17 @@ export default function Index() {
               )}
             </div>
             <div className="mt-3 flex items-center gap-3">
-              {activePost._creator.profile_pic && (
-                <img src={activePost._creator.profile_pic} className="h-8 w-8 rounded-full object-cover" alt="" />
+              {activePost.creator_profile_pic && (
+                <img src={activePost.creator_profile_pic} className="h-8 w-8 rounded-full object-cover" alt="" />
               )}
               <div>
-                <p className="text-sm text-white/90 line-clamp-1">{decodeContent(activePost.content)}</p>
+                <p className="text-sm text-white/90 line-clamp-1">{activePost.content}</p>
                 <Link
-                  to={`/creator/${activePost._creator.username}`}
+                  to={`/creator/${activePost.creator_username}`}
                   className="text-xs text-primary hover:underline"
                   onClick={() => { setActivePost(null); setActiveMediaUrl(""); }}
                 >
-                  {activePost._creator.name || activePost._creator.username}
+                  {activePost.creator_name || activePost.creator_username}
                 </Link>
               </div>
             </div>
