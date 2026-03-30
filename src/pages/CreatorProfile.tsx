@@ -159,6 +159,8 @@ export default function CreatorProfile() {
   const { username } = useParams<{ username: string }>();
   const [activePost, setActivePost] = useState<PostData | null>(null);
   const [activeMediaUrl, setActiveMediaUrl] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [gotoInput, setGotoInput] = useState("");
 
   const isObjectId = /^[a-f0-9]{12,24}$/.test(username || "");
 
