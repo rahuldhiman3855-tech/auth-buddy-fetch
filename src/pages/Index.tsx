@@ -13,8 +13,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
-const PAGE_SIZE = 12;
+const DISPLAY_PAGE_SIZE = 24;
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
 
 function proxyUrl(url?: string | null, options: { alt?: string | null; download?: boolean } = {}): string {
