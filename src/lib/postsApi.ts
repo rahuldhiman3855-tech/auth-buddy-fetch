@@ -46,7 +46,9 @@ export async function getStoredPosts(params: PostFilterParams): Promise<{ data: 
   }
 
   if (params.search) {
-    query = query.ilike("content", `%${params.search}%`);
+    query = query.or(
+      `content.ilike.%${params.search}%,creator_username.ilike.%${params.search}%,creator_name.ilike.%${params.search}%`
+    );
   }
 
   if (params.dateFrom) {
