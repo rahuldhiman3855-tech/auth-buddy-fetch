@@ -8,13 +8,14 @@ import {
 import { getStoredPosts, type StoredPost } from "@/lib/postsApi";
 import {
   Search, Video, Image, Loader2, Play, Eye, Heart, Clock, Download,
-  HardDrive, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight
+  HardDrive, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import SyncLatestPanel from "@/components/SyncLatestPanel";
 
 const PAGE_SIZE = 24;
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
@@ -192,6 +193,8 @@ export default function Index() {
 
   const [activePost, setActivePost] = useState<StoredPost | null>(null);
   const [activeMediaUrl, setActiveMediaUrl] = useState("");
+  const [showSync, setShowSync] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -242,7 +245,7 @@ export default function Index() {
       }
     })();
     return () => { cancelled = true; };
-  }, [safePage, typeFilter, searchQuery, sortBy]);
+  }, [safePage, typeFilter, searchQuery, sortBy, refreshKey]);
 
   const goToPage = (p: number) => {
     const clamped = Math.max(1, Math.min(p, totalPages));
@@ -375,6 +378,15 @@ export default function Index() {
                 <X className="h-3.5 w-3.5 mr-1" /> Clear
               </Button>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSync(true)}
+              className="ml-auto text-xs gap-1"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Sync Latest
+            </Button>
           </div>
         </div>
 
@@ -463,6 +475,13 @@ export default function Index() {
             </div>
           </div>
         </div>
+      )}
+
+      {showSync && (
+        <SyncLatestPanel
+          onClose={() => setShowSync(false)}
+          onSynced={() => setRefreshKey(k => k + 1)}
+        />
       )}
 
       <footer className="border-t border-border bg-card mt-12">
