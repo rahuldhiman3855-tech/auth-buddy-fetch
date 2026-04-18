@@ -281,8 +281,8 @@ export default function Index() {
 
   const hasFilters = searchQuery || typeFilter !== "all" || sortBy !== "date";
 
-  // Pagination controls component
-  const PaginationControls = () => (
+  // Pagination controls (function, not component, to avoid remounts that steal input focus)
+  const renderPagination = () =>
     totalPages > 1 ? (
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}>
@@ -307,8 +307,7 @@ export default function Index() {
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
-    ) : null
-  );
+    ) : null;
 
   return (
     <div className="min-h-screen bg-background">
