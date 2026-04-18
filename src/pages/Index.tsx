@@ -331,7 +331,6 @@ export default function Index() {
               {[
                 { value: "all", label: "All", icon: Filter },
                 { value: "Video", label: "Video", icon: Video },
-                { value: "Image", label: "Image", icon: Image },
               ].map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
