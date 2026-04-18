@@ -378,6 +378,15 @@ export default function Index() {
                 <X className="h-3.5 w-3.5 mr-1" /> Clear
               </Button>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSync(true)}
+              className="ml-auto text-xs gap-1"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Sync Latest
+            </Button>
           </div>
         </div>
 
