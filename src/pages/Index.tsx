@@ -394,7 +394,7 @@ export default function Index() {
           <p className="text-xs text-muted-foreground">
             {totalCount} posts · Page {safePage} of {totalPages}
           </p>
-          <PaginationControls />
+          {renderPagination()}
         </div>
 
         {/* Posts Grid */}
@@ -417,7 +417,7 @@ export default function Index() {
 
         {/* Bottom pagination */}
         <div className="flex items-center justify-center py-4">
-          <PaginationControls />
+          {renderPagination()}
         </div>
       </main>
 
