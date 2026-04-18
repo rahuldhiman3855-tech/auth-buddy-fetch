@@ -193,6 +193,8 @@ export default function Index() {
 
   const [activePost, setActivePost] = useState<StoredPost | null>(null);
   const [activeMediaUrl, setActiveMediaUrl] = useState("");
+  const [showSync, setShowSync] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
