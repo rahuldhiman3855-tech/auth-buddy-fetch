@@ -98,10 +98,11 @@ Deno.serve(async (req) => {
     let totalCreators = 0
 
     if (username) {
+      // Match by username OR official_id (creators may be stored with id as username)
       const { data, error } = await sb
         .from('creators')
         .select('official_id, username, name, profile_pic')
-        .eq('username', username)
+        .or(`username.eq.${username},official_id.eq.${username}`)
         .limit(1)
       if (error) throw error
       creators = data ?? []
