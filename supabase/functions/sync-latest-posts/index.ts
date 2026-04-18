@@ -47,7 +47,7 @@ async function fetchLatestPosts(influencerId: string, limit: number): Promise<an
     })
     if (!res.ok) return []
     const data = await res.json()
-    return (data?.data ?? []).filter((p: any) => !p.isDeleted && !p.isHided)
+    return (data?.data ?? []).filter((p: any) => !p.isDeleted && !p.isHided && p.type === 'Video')
   } catch {
     return []
   }
