@@ -245,7 +245,7 @@ export default function Index() {
       }
     })();
     return () => { cancelled = true; };
-  }, [safePage, typeFilter, searchQuery, sortBy]);
+  }, [safePage, typeFilter, searchQuery, sortBy, refreshKey]);
 
   const goToPage = (p: number) => {
     const clamped = Math.max(1, Math.min(p, totalPages));
