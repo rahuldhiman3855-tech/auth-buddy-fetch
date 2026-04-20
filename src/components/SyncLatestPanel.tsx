@@ -20,6 +20,8 @@ export default function SyncLatestPanel({ onClose, onSynced }: { onClose: () => 
   const [postsPerCreator, setPostsPerCreator] = useState("10");
   const [batchSize, setBatchSize] = useState("50");
   const [startOffset, setStartOffset] = useState("0");
+  const [backfill, setBackfill] = useState(false);
+  const [sinceDate, setSinceDate] = useState("2026-04-20");
   const [totalCreators, setTotalCreators] = useState<number | null>(null);
 
   const [running, setRunning] = useState(false);
@@ -40,6 +42,9 @@ export default function SyncLatestPanel({ onClose, onSynced }: { onClose: () => 
 
   const callFunction = async (offset: number, limit: number, name?: string) => {
     const params = new URLSearchParams({ posts: postsPerCreator });
+    if (backfill && sinceDate) {
+      params.set("since", sinceDate);
+    }
     if (name) {
       params.set("username", name);
     } else {
@@ -192,7 +197,43 @@ export default function SyncLatestPanel({ onClose, onSynced }: { onClose: () => 
 
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Latest posts per creator</label>
-            <Input type="number" min={1} max={50} value={postsPerCreator} onChange={(e) => setPostsPerCreator(e.target.value)} disabled={running} />
+            <Input
+              type="number" min={1} max={50}
+              value={postsPerCreator}
+              onChange={(e) => setPostsPerCreator(e.target.value)}
+              disabled={running || backfill}
+            />
+            {backfill && (
+              <p className="text-[10px] text-muted-foreground">Ignored in backfill mode — all videos until cutoff are fetched.</p>
+            )}
+          </div>
+
+          {/* Backfill toggle */}
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={backfill}
+                onChange={(e) => setBackfill(e.target.checked)}
+                disabled={running}
+                className="h-4 w-4 accent-primary"
+              />
+              <span className="text-xs font-medium">Backfill all videos since date</span>
+            </label>
+            {backfill && (
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-muted-foreground">Sync every video posted on or after</label>
+                <Input
+                  type="date"
+                  value={sinceDate}
+                  onChange={(e) => setSinceDate(e.target.value)}
+                  disabled={running}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Paginates through each creator's full history until reaching this cutoff.
+                </p>
+              </div>
+            )}
           </div>
 
           {mode === "all" && totalCreators !== null && (

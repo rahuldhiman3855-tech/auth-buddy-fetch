@@ -39,7 +39,7 @@ function thumbProxy(url?: string | null): string {
   return `${PROXY_BASE}?url=${encodeURIComponent(url)}`;
 }
 
-function CreatorCard({ creator, thumbs }: { creator: CreatorRow; thumbs: string[] }) {
+function CreatorCard({ creator, thumbs = [] }: { creator: CreatorRow; thumbs?: string[] }) {
   const ref = useRef<HTMLAnchorElement>(null);
   const [visible, setVisible] = useState(false);
 

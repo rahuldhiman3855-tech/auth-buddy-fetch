@@ -11,6 +11,8 @@ const ADMIN_USER_ID = '6144858b2f03d06a7dd008e4'
 const BATCH_SIZE = 5
 const DELAY_MS = 800
 const DEFAULT_LIMIT_PER_CREATOR = 10
+const PAGE_SIZE = 50              // posts per API page when paginating
+const MAX_PAGES_PER_CREATOR = 40  // safety cap = 2000 posts/creator
 
 function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms))
@@ -53,6 +55,65 @@ async function fetchLatestPosts(influencerId: string, limit: number): Promise<an
   }
 }
 
+/** Fetch a single page of posts (no type filter; caller decides) */
+async function fetchPostPage(influencerId: string, skip: number, limit: number): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE}/posts/getUserPost`, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'content-type': 'application/json',
+        'x-off-country-code': 'IN',
+      },
+      body: JSON.stringify({
+        isLogin: 'false',
+        influencerId,
+        userId: ADMIN_USER_ID,
+        skip,
+        limit,
+        key: AUTH_KEY,
+      }),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return data?.data ?? []
+  } catch {
+    return []
+  }
+}
+
+/** Paginate ALL videos newer than `sinceDate` (inclusive). Stops when API returns older posts. */
+async function fetchVideosSince(influencerId: string, sinceDate: Date): Promise<any[]> {
+  const sinceMs = sinceDate.getTime()
+  const collected: any[] = []
+  let skip = 0
+
+  for (let page = 0; page < MAX_PAGES_PER_CREATOR; page++) {
+    const batch = await fetchPostPage(influencerId, skip, PAGE_SIZE)
+    if (batch.length === 0) break
+
+    let reachedCutoff = false
+    for (const p of batch) {
+      if (p.isDeleted || p.isHided) continue
+      const dateStr = p.date || p.created_at
+      const ts = dateStr ? new Date(dateStr).getTime() : NaN
+      // If we have a valid date older than cutoff, stop pagination entirely
+      if (!Number.isNaN(ts) && ts < sinceMs) {
+        reachedCutoff = true
+        continue
+      }
+      if (p.type === 'Video') collected.push(p)
+    }
+
+    if (reachedCutoff) break
+    if (batch.length < PAGE_SIZE) break
+    skip += PAGE_SIZE
+    await sleep(150) // gentle on origin
+  }
+
+  return collected
+}
+
 function postToRow(p: any, c: { official_id: string; username: string; name: string; profile_pic: string | null }) {
   return {
     official_id: p._id,
@@ -91,6 +152,9 @@ Deno.serve(async (req) => {
     const offset = parseInt(url.searchParams.get('offset') || '0')
     const limit = parseInt(url.searchParams.get('limit') || '50') // creators per batch
     const postsPerCreator = parseInt(url.searchParams.get('posts') || String(DEFAULT_LIMIT_PER_CREATOR))
+    const sinceParam = url.searchParams.get('since') // e.g. "2026-04-20" — when set, paginate ALL videos until cutoff
+    const sinceDate = sinceParam ? new Date(sinceParam) : null
+    const useSince = sinceDate && !Number.isNaN(sinceDate.getTime())
     const runId = url.searchParams.get('run_id') || crypto.randomUUID()
 
     // Fetch target creator(s)
@@ -129,8 +193,12 @@ Deno.serve(async (req) => {
       run_id: runId,
       status: 'running',
       message: username
-        ? `Syncing latest ${postsPerCreator} posts for @${username}`
-        : `Syncing latest ${postsPerCreator} posts: creators ${offset + 1}–${Math.min(offset + limit, totalCreators)}`,
+        ? (useSince
+            ? `Backfilling all videos since ${sinceParam} for @${username}`
+            : `Syncing latest ${postsPerCreator} posts for @${username}`)
+        : (useSince
+            ? `Backfilling all videos since ${sinceParam}: creators ${offset + 1}–${Math.min(offset + limit, totalCreators)}`
+            : `Syncing latest ${postsPerCreator} posts: creators ${offset + 1}–${Math.min(offset + limit, totalCreators)}`),
       creators_done: offset,
       creators_total: totalCreators,
     })
@@ -144,7 +212,9 @@ Deno.serve(async (req) => {
       const batch = creators.slice(i, i + BATCH_SIZE)
       const batchResults = await Promise.allSettled(
         batch.map(async (c) => {
-          const posts = await fetchLatestPosts(c.official_id, postsPerCreator)
+          const posts = useSince
+            ? await fetchVideosSince(c.official_id, sinceDate!)
+            : await fetchLatestPosts(c.official_id, postsPerCreator)
           if (posts.length === 0) {
             return { creator: c.username, name: c.name, posts: 0, new: 0, status: 'no_posts' }
           }
