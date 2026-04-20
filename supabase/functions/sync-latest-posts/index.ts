@@ -11,6 +11,8 @@ const ADMIN_USER_ID = '6144858b2f03d06a7dd008e4'
 const BATCH_SIZE = 5
 const DELAY_MS = 800
 const DEFAULT_LIMIT_PER_CREATOR = 10
+const PAGE_SIZE = 50              // posts per API page when paginating
+const MAX_PAGES_PER_CREATOR = 40  // safety cap = 2000 posts/creator
 
 function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms))
