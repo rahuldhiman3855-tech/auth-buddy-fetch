@@ -152,6 +152,9 @@ Deno.serve(async (req) => {
     const offset = parseInt(url.searchParams.get('offset') || '0')
     const limit = parseInt(url.searchParams.get('limit') || '50') // creators per batch
     const postsPerCreator = parseInt(url.searchParams.get('posts') || String(DEFAULT_LIMIT_PER_CREATOR))
+    const sinceParam = url.searchParams.get('since') // e.g. "2026-04-20" — when set, paginate ALL videos until cutoff
+    const sinceDate = sinceParam ? new Date(sinceParam) : null
+    const useSince = sinceDate && !Number.isNaN(sinceDate.getTime())
     const runId = url.searchParams.get('run_id') || crypto.randomUUID()
 
     // Fetch target creator(s)
@@ -190,8 +193,12 @@ Deno.serve(async (req) => {
       run_id: runId,
       status: 'running',
       message: username
-        ? `Syncing latest ${postsPerCreator} posts for @${username}`
-        : `Syncing latest ${postsPerCreator} posts: creators ${offset + 1}–${Math.min(offset + limit, totalCreators)}`,
+        ? (useSince
+            ? `Backfilling all videos since ${sinceParam} for @${username}`
+            : `Syncing latest ${postsPerCreator} posts for @${username}`)
+        : (useSince
+            ? `Backfilling all videos since ${sinceParam}: creators ${offset + 1}–${Math.min(offset + limit, totalCreators)}`
+            : `Syncing latest ${postsPerCreator} posts: creators ${offset + 1}–${Math.min(offset + limit, totalCreators)}`),
       creators_done: offset,
       creators_total: totalCreators,
     })
@@ -205,7 +212,9 @@ Deno.serve(async (req) => {
       const batch = creators.slice(i, i + BATCH_SIZE)
       const batchResults = await Promise.allSettled(
         batch.map(async (c) => {
-          const posts = await fetchLatestPosts(c.official_id, postsPerCreator)
+          const posts = useSince
+            ? await fetchVideosSince(c.official_id, sinceDate!)
+            : await fetchLatestPosts(c.official_id, postsPerCreator)
           if (posts.length === 0) {
             return { creator: c.username, name: c.name, posts: 0, new: 0, status: 'no_posts' }
           }
