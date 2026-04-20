@@ -362,7 +362,10 @@ export default function Index() {
       </main>
 
       {showSync && (
-        <SyncLatestPanel onClose={() => setShowSync(false)} />
+        <SyncLatestPanel
+          onClose={() => setShowSync(false)}
+          onSynced={() => setCurrentPage(1)}
+        />
       )}
     </div>
   );
