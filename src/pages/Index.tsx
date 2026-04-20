@@ -33,7 +33,13 @@ interface CreatorRow {
   updated_at: string;
 }
 
-function CreatorCard({ creator }: { creator: CreatorRow }) {
+const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
+function thumbProxy(url?: string | null): string {
+  if (!url) return "";
+  return `${PROXY_BASE}?url=${encodeURIComponent(url)}`;
+}
+
+function CreatorCard({ creator, thumbs }: { creator: CreatorRow; thumbs: string[] }) {
   const ref = useRef<HTMLAnchorElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -112,6 +118,23 @@ function CreatorCard({ creator }: { creator: CreatorRow }) {
             {creator.category}
           </span>
         )}
+
+        {/* Latest video thumbnails strip */}
+        {thumbs.length > 0 && (
+          <div className="mt-2 grid grid-cols-3 gap-1 w-full">
+            {thumbs.map((t, i) => (
+              <div key={i} className="aspect-square overflow-hidden rounded-md bg-muted">
+                <img
+                  src={t}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </Link>
   );
@@ -122,6 +145,7 @@ export default function Index() {
   const urlPage = Math.max(1, Number(searchParams.get("page")) || 1);
 
   const [creators, setCreators] = useState<CreatorRow[]>([]);
+  const [thumbsByCreator, setThumbsByCreator] = useState<Record<string, string[]>>({});
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -192,8 +216,30 @@ export default function Index() {
         const { data, count, error } = await query.range(offset, offset + PAGE_SIZE - 1);
         if (error) throw error;
         if (cancelled) return;
-        setCreators((data as CreatorRow[]) ?? []);
+        const list = (data as CreatorRow[]) ?? [];
+        setCreators(list);
         setTotalCount(count ?? 0);
+        setThumbsByCreator({});
+
+        // Fetch latest 3 video thumbnails for each creator in parallel
+        const creatorIds = list.map((c) => c.official_id).filter(Boolean);
+        if (creatorIds.length > 0) {
+          const results = await Promise.all(
+            creatorIds.map(async (cid) => {
+              const { data: posts } = await supabase
+                .from("posts")
+                .select("thumbnail_url")
+                .eq("creator_id", cid)
+                .eq("type", "Video")
+                .not("thumbnail_url", "is", null)
+                .order("post_date", { ascending: false, nullsFirst: false })
+                .limit(3);
+              return [cid, (posts ?? []).map((p) => thumbProxy(p.thumbnail_url)).filter(Boolean)] as const;
+            })
+          );
+          if (cancelled) return;
+          setThumbsByCreator(Object.fromEntries(results));
+        }
       } catch (e) {
         console.error("Failed to load creators:", e);
       } finally {
@@ -351,7 +397,7 @@ export default function Index() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {creators.map((c) => (
-              <CreatorCard key={c.id} creator={c} />
+              <CreatorCard key={c.id} creator={c} thumbs={thumbsByCreator[c.official_id] ?? []} />
             ))}
           </div>
         )}
