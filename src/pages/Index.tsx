@@ -33,7 +33,13 @@ interface CreatorRow {
   updated_at: string;
 }
 
-function CreatorCard({ creator }: { creator: CreatorRow }) {
+const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-proxy`;
+function thumbProxy(url?: string | null): string {
+  if (!url) return "";
+  return `${PROXY_BASE}?url=${encodeURIComponent(url)}`;
+}
+
+function CreatorCard({ creator, thumbs }: { creator: CreatorRow; thumbs: string[] }) {
   const ref = useRef<HTMLAnchorElement>(null);
   const [visible, setVisible] = useState(false);
 
