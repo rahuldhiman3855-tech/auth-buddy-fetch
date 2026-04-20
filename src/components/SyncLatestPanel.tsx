@@ -235,6 +235,8 @@ export default function SyncLatestPanel({ onClose, onSynced }: { onClose: () => 
               </div>
             )}
           </div>
+
+          {mode === "all" && totalCreators !== null && (
             <p className="text-[11px] text-muted-foreground">
               {totalCreators.toLocaleString()} creators discovered total
             </p>
