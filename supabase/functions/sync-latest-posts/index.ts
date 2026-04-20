@@ -55,6 +55,65 @@ async function fetchLatestPosts(influencerId: string, limit: number): Promise<an
   }
 }
 
+/** Fetch a single page of posts (no type filter; caller decides) */
+async function fetchPostPage(influencerId: string, skip: number, limit: number): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE}/posts/getUserPost`, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'content-type': 'application/json',
+        'x-off-country-code': 'IN',
+      },
+      body: JSON.stringify({
+        isLogin: 'false',
+        influencerId,
+        userId: ADMIN_USER_ID,
+        skip,
+        limit,
+        key: AUTH_KEY,
+      }),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return data?.data ?? []
+  } catch {
+    return []
+  }
+}
+
+/** Paginate ALL videos newer than `sinceDate` (inclusive). Stops when API returns older posts. */
+async function fetchVideosSince(influencerId: string, sinceDate: Date): Promise<any[]> {
+  const sinceMs = sinceDate.getTime()
+  const collected: any[] = []
+  let skip = 0
+
+  for (let page = 0; page < MAX_PAGES_PER_CREATOR; page++) {
+    const batch = await fetchPostPage(influencerId, skip, PAGE_SIZE)
+    if (batch.length === 0) break
+
+    let reachedCutoff = false
+    for (const p of batch) {
+      if (p.isDeleted || p.isHided) continue
+      const dateStr = p.date || p.created_at
+      const ts = dateStr ? new Date(dateStr).getTime() : NaN
+      // If we have a valid date older than cutoff, stop pagination entirely
+      if (!Number.isNaN(ts) && ts < sinceMs) {
+        reachedCutoff = true
+        continue
+      }
+      if (p.type === 'Video') collected.push(p)
+    }
+
+    if (reachedCutoff) break
+    if (batch.length < PAGE_SIZE) break
+    skip += PAGE_SIZE
+    await sleep(150) // gentle on origin
+  }
+
+  return collected
+}
+
 function postToRow(p: any, c: { official_id: string; username: string; name: string; profile_pic: string | null }) {
   return {
     official_id: p._id,
