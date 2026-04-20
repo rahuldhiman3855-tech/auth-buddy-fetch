@@ -118,6 +118,23 @@ function CreatorCard({ creator, thumbs }: { creator: CreatorRow; thumbs: string[
             {creator.category}
           </span>
         )}
+
+        {/* Latest video thumbnails strip */}
+        {thumbs.length > 0 && (
+          <div className="mt-2 grid grid-cols-3 gap-1 w-full">
+            {thumbs.map((t, i) => (
+              <div key={i} className="aspect-square overflow-hidden rounded-md bg-muted">
+                <img
+                  src={t}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </Link>
   );
@@ -128,6 +145,7 @@ export default function Index() {
   const urlPage = Math.max(1, Number(searchParams.get("page")) || 1);
 
   const [creators, setCreators] = useState<CreatorRow[]>([]);
+  const [thumbsByCreator, setThumbsByCreator] = useState<Record<string, string[]>>({});
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
