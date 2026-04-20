@@ -216,8 +216,30 @@ export default function Index() {
         const { data, count, error } = await query.range(offset, offset + PAGE_SIZE - 1);
         if (error) throw error;
         if (cancelled) return;
-        setCreators((data as CreatorRow[]) ?? []);
+        const list = (data as CreatorRow[]) ?? [];
+        setCreators(list);
         setTotalCount(count ?? 0);
+        setThumbsByCreator({});
+
+        // Fetch latest 3 video thumbnails for each creator in parallel
+        const creatorIds = list.map((c) => c.official_id).filter(Boolean);
+        if (creatorIds.length > 0) {
+          const results = await Promise.all(
+            creatorIds.map(async (cid) => {
+              const { data: posts } = await supabase
+                .from("posts")
+                .select("thumbnail_url")
+                .eq("creator_id", cid)
+                .eq("type", "Video")
+                .not("thumbnail_url", "is", null)
+                .order("post_date", { ascending: false, nullsFirst: false })
+                .limit(3);
+              return [cid, (posts ?? []).map((p) => thumbProxy(p.thumbnail_url)).filter(Boolean)] as const;
+            })
+          );
+          if (cancelled) return;
+          setThumbsByCreator(Object.fromEntries(results));
+        }
       } catch (e) {
         console.error("Failed to load creators:", e);
       } finally {
