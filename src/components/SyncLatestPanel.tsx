@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, RefreshCw, User, Globe, X, CheckCircle2, AlertCircle, Square, Play } from "lucide-react";
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-latest-posts`;
+const DISCOVER_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/discover-creators`;
 const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 interface SyncResult {
@@ -124,6 +125,56 @@ export default function SyncLatestPanel({ onClose, onSynced }: { onClose: () => 
   };
 
   const stopSync = () => { stopRef.current = true; };
+
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverInfo, setDiscoverInfo] = useState<string>("");
+  const discoverStopRef = useRef(false);
+
+  const runDiscover = async () => {
+    setError("");
+    setDiscoverInfo("");
+    setDiscovering(true);
+    discoverStopRef.current = false;
+    let totalInserted = 0;
+    let totalScanned = 0;
+    let skip = 0;
+    try {
+      for (let round = 0; round < 20 && !discoverStopRef.current; round++) {
+        setDiscoverInfo(`Scanning posts (skip ${skip})… inserted ${totalInserted} new so far`);
+        const res = await fetch(DISCOVER_URL, {
+          method: "POST",
+          headers: {
+            apikey: ANON,
+            authorization: `Bearer ${ANON}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            mode: "deep-discover",
+            pages: 5,
+            pageSize: 100,
+            startSkip: skip,
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        totalInserted += data.inserted ?? 0;
+        totalScanned += data.postsScanned ?? 0;
+        if (!data.postsScanned || data.postsScanned === 0) break;
+        skip = data.nextSkip ?? (skip + 500);
+        // refresh creator count
+        const { count } = await supabase.from("creators").select("*", { count: "exact", head: true });
+        if (typeof count === "number") setTotalCreators(count);
+        onSynced();
+      }
+      setDiscoverInfo(`Done. Scanned ${totalScanned} posts, added ${totalInserted} new creators.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
+  const stopDiscover = () => { discoverStopRef.current = true; };
 
   const total = totalCreators ?? 0;
   const done = Math.min(currentOffset + summary.processed, total);
@@ -253,6 +304,30 @@ export default function SyncLatestPanel({ onClose, onSynced }: { onClose: () => 
               <Square className="h-4 w-4 mr-2" /> Stop Sync
             </Button>
           )}
+
+          {/* Discover new creators */}
+          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold">Discover new creators</p>
+                <p className="text-[10px] text-muted-foreground">Scans the public post feed for unseen creator IDs and adds them.</p>
+              </div>
+              {!discovering ? (
+                <Button size="sm" variant="secondary" onClick={runDiscover} disabled={running}>
+                  <Play className="h-3.5 w-3.5 mr-1" /> Discover
+                </Button>
+              ) : (
+                <Button size="sm" variant="destructive" onClick={stopDiscover}>
+                  <Square className="h-3.5 w-3.5 mr-1" /> Stop
+                </Button>
+              )}
+            </div>
+            {(discovering || discoverInfo) && (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-2">
+                {discovering && <Loader2 className="h-3 w-3 animate-spin" />} {discoverInfo}
+              </p>
+            )}
+          </div>
 
           {/* Progress bar (all mode) */}
           {mode === "all" && (running || summary.processed > 0) && total > 0 && (
