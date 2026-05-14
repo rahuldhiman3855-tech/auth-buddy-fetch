@@ -13,6 +13,9 @@ const defaultHeaders = {
 const AUTH_KEY = 'd41d8cd98f00b204e9800998ecf8427e';
 const ADMIN_USER_ID = '6144858b2f03d06a7dd008e4';
 
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
 async function checkUsername(username: string): Promise<any | null> {
   try {
     const res = await fetch(`${API_BASE}/influencer/${username}`, { headers: defaultHeaders });
@@ -73,6 +76,72 @@ async function discoverFromPosts(): Promise<string[]> {
   }
 }
 
+async function fetchPostsPage(skip: number, limit: number): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/posts/getUserPost`, {
+    method: 'POST',
+    headers: defaultHeaders,
+    body: JSON.stringify({
+      influencerId: { $exists: true },
+      userId: ADMIN_USER_ID,
+      skip,
+      limit,
+      key: AUTH_KEY,
+      isLogin: 'false',
+    }),
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json?.data ?? [];
+}
+
+async function getExistingIds(): Promise<Set<string>> {
+  const set = new Set<string>();
+  let from = 0;
+  const step = 1000;
+  while (true) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/creators?select=official_id`,
+      {
+        headers: {
+          apikey: SERVICE_KEY,
+          authorization: `Bearer ${SERVICE_KEY}`,
+          Range: `${from}-${from + step - 1}`,
+          'Range-Unit': 'items',
+          Prefer: 'count=exact',
+        },
+      }
+    );
+    if (!res.ok) break;
+    const rows = await res.json();
+    for (const r of rows) if (r.official_id) set.add(r.official_id);
+    if (rows.length < step) break;
+    from += step;
+  }
+  return set;
+}
+
+async function insertCreators(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const rows = ids.map((id) => ({
+    official_id: id,
+    username: id,
+    name: '',
+  }));
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/creators?on_conflict=official_id`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_KEY,
+      authorization: `Bearer ${SERVICE_KEY}`,
+      'content-type': 'application/json',
+      Prefer: 'resolution=ignore-duplicates,return=representation',
+    },
+    body: JSON.stringify(rows),
+  });
+  if (!res.ok) return 0;
+  const inserted = await res.json();
+  return Array.isArray(inserted) ? inserted.length : 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -80,7 +149,45 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { usernames, mode } = body;
+    const { usernames, mode, pages, pageSize, startSkip } = body;
+
+    // Mode: "deep-discover" - paginate posts API and insert NEW unique creator IDs
+    if (mode === 'deep-discover') {
+      const limit = Math.min(200, Math.max(10, Number(pageSize) || 100));
+      const maxPages = Math.min(50, Math.max(1, Number(pages) || 10));
+      let skip = Math.max(0, Number(startSkip) || 0);
+
+      const existing = await getExistingIds();
+      const newIds = new Set<string>();
+      let postsScanned = 0;
+
+      for (let i = 0; i < maxPages; i++) {
+        const posts = await fetchPostsPage(skip, limit);
+        if (posts.length === 0) break;
+        postsScanned += posts.length;
+        for (const p of posts) {
+          const uid = p.userId;
+          if (uid && !existing.has(uid)) newIds.add(uid);
+        }
+        skip += limit;
+        if (posts.length < limit) break;
+        await new Promise((r) => setTimeout(r, 150));
+      }
+
+      const ids = Array.from(newIds);
+      const inserted = await insertCreators(ids);
+
+      return new Response(
+        JSON.stringify({
+          status: true,
+          postsScanned,
+          uniqueNew: ids.length,
+          inserted,
+          nextSkip: skip,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Mode: "nosql-posts" - discover via NoSQL injection
     if (mode === 'nosql-posts') {
