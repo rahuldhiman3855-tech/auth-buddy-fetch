@@ -94,6 +94,30 @@ async function fetchPostsPage(skip: number, limit: number): Promise<any[]> {
   return json?.data ?? [];
 }
 
+/** Cursor-based page using _id $lt injection — bypasses MongoDB deep-skip limits */
+async function fetchPostsBefore(beforeId: string | null, limit: number): Promise<any[]> {
+  const influencerFilter: any = { $exists: true };
+  const body: any = {
+    influencerId: influencerFilter,
+    userId: ADMIN_USER_ID,
+    skip: 0,
+    limit,
+    key: AUTH_KEY,
+    isLogin: 'false',
+  };
+  if (beforeId) {
+    body._id = { $lt: beforeId };
+  }
+  const res = await fetch(`${API_BASE}/posts/getUserPost`, {
+    method: 'POST',
+    headers: defaultHeaders,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json?.data ?? [];
+}
+
 async function getExistingIds(): Promise<Set<string>> {
   const set = new Set<string>();
   let from = 0;
@@ -184,6 +208,48 @@ Deno.serve(async (req) => {
           uniqueNew: ids.length,
           inserted,
           nextSkip: skip,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Mode: "cursor-discover" — uses _id $lt to walk past the deep-skip cap
+    if (mode === 'cursor-discover') {
+      const limit = Math.min(200, Math.max(10, Number(pageSize) || 100));
+      const maxPages = Math.min(100, Math.max(1, Number(pages) || 10));
+      let beforeId: string | null = body.beforeId || null;
+
+      const existing = await getExistingIds();
+      const newIds = new Set<string>();
+      let postsScanned = 0;
+      let lastId: string | null = beforeId;
+
+      for (let i = 0; i < maxPages; i++) {
+        const posts = await fetchPostsBefore(lastId, limit);
+        if (posts.length === 0) break;
+        postsScanned += posts.length;
+        for (const p of posts) {
+          const uid = p.userId;
+          if (uid && !existing.has(uid)) newIds.add(uid);
+        }
+        // Cursor = smallest _id in this page (results are sorted desc by _id)
+        const last = posts[posts.length - 1];
+        if (!last?._id || last._id === lastId) break;
+        lastId = last._id;
+        if (posts.length < limit) break;
+        await new Promise((r) => setTimeout(r, 150));
+      }
+
+      const ids = Array.from(newIds);
+      const inserted = await insertCreators(ids);
+
+      return new Response(
+        JSON.stringify({
+          status: true,
+          postsScanned,
+          uniqueNew: ids.length,
+          inserted,
+          nextBeforeId: lastId,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
